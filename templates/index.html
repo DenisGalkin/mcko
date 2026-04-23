@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="ru" translate="no" class="notranslate">
+<head>
+    <meta charset="UTF-8">
+    <title>Компьютерное тестирование</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div style="clear:both"></div>
+
+<div id="header">
+    <div class="subheader2x">
+        <table border="0" cellpadding="0" cellspacing="0" width="100%">
+            <tr>
+                <td>
+                    <span id="ping" style="position:absolute; opacity:0.2; display:none;">*</span>
+                    <p style="margin-left:15px;color:#000000;font-size:12pt;text-indent:0"> Задания: </p>
+                </td>
+                <td>
+                    <p id="topline"><font>Оставшееся время - --:--</font></p>
+                </td>
+            </tr>
+        </table>
+
+        <div>
+            <button class="qnum" type="button" id="descriptionBtn">Описание</button>
+            <button class="qnum yellow task-btn" type="button" data-task="1">1</button>
+            <button class="qnum yellow task-btn" type="button" data-task="2">2</button>
+            <button class="qnum task-btn" type="button" data-task="3">3</button>
+            <button class="qnum task-btn" type="button" data-task="4">4</button>
+            <button class="qnum task-btn" type="button" data-task="5">5</button>
+            <button class="qnum yellow task-btn" type="button" data-task="6">6</button>
+            <button class="qnum qramka task-btn" type="button" data-task="7">7</button>
+            <button class="qnum task-btn" type="button" data-task="8">8</button>
+            <button class="qnum" type="button" id="finishBtn">закончить</button>
+        </div>
+        <div class="clear"></div>
+    </div>
+</div>
+
+<div id="reserved"></div>
+
+<div id="content">
+    <div id="QuestionTest">
+        <p style="border:1px solid #000;text-align:center;">
+            <b>Ответ на задание запишите в виде целого числа или конечной десятичной дроби.</b>
+        </p>
+        <br>
+
+        <p class="MsoNormal">
+            В некотором случайном эксперименте рассматривается случайная величина <i>X</i>.
+            Известно, что <i>P(X ≤ 15)</i> = 0,77 и <i>P(X ≥ 10)</i> = 0,58.
+            Найдите вероятность события <i>(10 ≤ X ≤ 15)</i>.
+        </p>
+
+        <div class="answer_flex">
+            <p class="MsoNormal">
+                Ответ:
+                <input
+                    type="text"
+                    id="a0"
+                    style="width:90px; text-align:center;"
+                    autocomplete="off"
+                    spellcheck="false"
+                >.
+            </p>
+        </div>
+    </div>
+
+    <div class="answer" id="descriptionWrapper" style="display:none; width:990px;">
+        <div class="description_panel" id="descriptionPanel">
+            <div id="descriptionList">
+                {% if tasks %}
+                    {% for task in tasks %}
+                        <div class="desc_row" data-task="{{ task.task_number }}">
+                            <div class="desc_label">Задание {{ task.task_number }}</div>
+                            <input class="desc_input" type="text" value="{{ task.answer_text|e }}">
+                            <button type="button" class="save-desc-btn" data-task="{{ task.task_number }}">Отправить</button>
+                            <span class="flash_ok"></span>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty_files" id="emptyDescription">Файлов пока нет.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="answer" id="uploadWrapper" style="display:none; width:990px;">
+        <div class="upload_box" id="uploadBox">
+            <div class="upload_drop" id="dropZone">
+                <div class="upload_title">Загрузить файл</div>
+                <div class="upload_text">Перетащите файл сюда, вставьте его или выберите через проводник</div>
+                <button type="button" id="pickBtn">Выбрать файл</button>
+                <input type="file" id="fileInput" hidden>
+            </div>
+        </div>
+    </div>
+
+    <div class="answer" id="filesWrapper" style="display:none; width:990px;">
+        <div class="files_panel" id="filesPanel">
+            <div id="fileList">
+                {% if tasks %}
+                    {% for task in tasks %}
+                        <div class="file_row" data-task="{{ task.task_number }}">
+                            <div class="file_meta">
+                                <div class="file_title">Задание {{ task.task_number }}</div>
+                                <div class="file_name">{{ task.filename }}</div>
+                                <div class="file_date">{{ task.created }}</div>
+                            </div>
+                            <div class="file_actions">
+                                <a href="/files/{{ task.filename|urlencode }}">Скачать</a>
+                                <button type="button" class="delete-btn" data-task="{{ task.task_number }}">Удалить</button>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty_files" id="emptyState">Файлов пока нет.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div id="AnswerHere">
+        <button id="saveAnswerBtn" type="button" style="margin-top:15px">Сохранить ответ</button>
+    </div>
+</div>
+
+<br>
+<center>
+    <font id="footer_fake">Page generated in 0.023, memory usage: 487 kb</font>
+</center>
+
+<script>
+const finishTimestamp = {{ finish_ts }};
+const initialAnswers = {{ answers_map|tojson }};
+
+function CheckInt(element) {
+    element.value = element.value.replace(/[^-–0123456789.,]+/g, '');
+    element.value = element.value.replace(/\./g, ',');
+    element.value = element.value.replace(/-/, '–');
+}
+
+const uploadWrapper = document.getElementById('uploadWrapper');
+const filesWrapper = document.getElementById('filesWrapper');
+const descriptionWrapper = document.getElementById('descriptionWrapper');
+
+const uploadBox = document.getElementById('uploadBox');
+const filesPanel = document.getElementById('filesPanel');
+const descriptionPanel = document.getElementById('descriptionPanel');
+
+const saveAnswerBtn = document.getElementById('saveAnswerBtn');
+const finishBtn = document.getElementById('finishBtn');
+const descriptionBtn = document.getElementById('descriptionBtn');
+
+const dropZone = document.getElementById('dropZone');
+const pickBtn = document.getElementById('pickBtn');
+const fileInput = document.getElementById('fileInput');
+const fileList = document.getElementById('fileList');
+const descriptionList = document.getElementById('descriptionList');
+const answerInput = document.getElementById('a0');
+
+const state = {
+    answers: { ...initialAnswers }
+};
+
+answerInput.addEventListener('input', function () {
+    CheckInt(this);
+});
+
+saveAnswerBtn.addEventListener('click', function () {
+    const opened = uploadWrapper.style.display === 'block';
+    uploadWrapper.style.display = opened ? 'none' : 'block';
+    uploadBox.style.display = opened ? 'none' : 'block';
+});
+
+finishBtn.addEventListener('click', function () {
+    const opened = filesWrapper.style.display === 'block';
+    filesWrapper.style.display = opened ? 'none' : 'block';
+    filesPanel.style.display = opened ? 'none' : 'block';
+});
+
+descriptionBtn.addEventListener('click', function () {
+    const opened = descriptionWrapper.style.display === 'block';
+    descriptionWrapper.style.display = opened ? 'none' : 'block';
+    descriptionPanel.style.display = opened ? 'none' : 'block';
+});
+
+document.querySelectorAll('.task-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+        const task = btn.dataset.task;
+        answerInput.value = state.answers[task] || '';
+    });
+});
+
+pickBtn.addEventListener('click', function () {
+    fileInput.click();
+});
+
+fileInput.addEventListener('change', function () {
+    if (fileInput.files.length) {
+        uploadFile(fileInput.files[0]);
+    }
+});
+
+['dragenter', 'dragover'].forEach(function (name) {
+    dropZone.addEventListener(name, function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.classList.add('over');
+    });
+});
+
+['dragleave', 'drop'].forEach(function (name) {
+    dropZone.addEventListener(name, function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.classList.remove('over');
+    });
+});
+
+dropZone.addEventListener('drop', function (e) {
+    const files = e.dataTransfer.files;
+    if (files.length) {
+        uploadFile(files[0]);
+    }
+});
+
+document.addEventListener('paste', function (e) {
+    const items = e.clipboardData ? e.clipboardData.items : [];
+    for (const item of items) {
+        if (item.kind === 'file') {
+            const file = item.getAsFile();
+            if (file) {
+                if (uploadWrapper.style.display !== 'block') {
+                    uploadWrapper.style.display = 'block';
+                    uploadBox.style.display = 'block';
+                }
+                uploadFile(file);
+                break;
+            }
+        }
+    }
+});
+
+async function uploadFile(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('task_number', answerInput.value.trim());
+
+    try {
+        const response = await fetch('/upload', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            alert(data.error || 'Не удалось загрузить файл');
+            return;
+        }
+
+        upsertTaskFileRow(data.task);
+        upsertDescriptionRow(data.task);
+        state.answers[String(data.task.task_number)] = data.task.answer_text || '';
+        fileInput.value = '';
+    } catch (e) {
+        alert('Не удалось загрузить файл');
+    }
+}
+
+function upsertTaskFileRow(task) {
+    const emptyState = document.getElementById('emptyState');
+    if (emptyState) emptyState.remove();
+
+    const taskKey = String(task.task_number);
+    const existing = fileList.querySelector(`.file_row[data-task="${CSS.escape(taskKey)}"]`);
+    if (existing) existing.remove();
+
+    const row = document.createElement('div');
+    row.className = 'file_row';
+    row.dataset.task = task.task_number;
+    row.innerHTML = `
+        <div class="file_meta">
+            <div class="file_title">Задание ${task.task_number}</div>
+            <div class="file_name">${escapeHtml(task.filename)}</div>
+            <div class="file_date">${escapeHtml(task.created)}</div>
+        </div>
+        <div class="file_actions">
+            <a href="/files/${encodeURIComponent(task.filename)}">Скачать</a>
+            <button type="button" class="delete-btn" data-task="${task.task_number}">Удалить</button>
+        </div>
+    `;
+
+    const rows = [...fileList.querySelectorAll('.file_row')];
+    let inserted = false;
+
+    for (const current of rows) {
+        const currentTask = Number(current.dataset.task);
+        if (Number(task.task_number) < currentTask) {
+            fileList.insertBefore(row, current);
+            inserted = true;
+            break;
+        }
+    }
+
+    if (!inserted) {
+        fileList.appendChild(row);
+    }
+}
+
+function upsertDescriptionRow(task) {
+    const empty = document.getElementById('emptyDescription');
+    if (empty) empty.remove();
+
+    const taskKey = String(task.task_number);
+    const existing = descriptionList.querySelector(`.desc_row[data-task="${CSS.escape(taskKey)}"]`);
+    const value = state.answers[taskKey] || task.answer_text || '';
+
+    if (existing) {
+        existing.querySelector('.desc_input').value = value;
+        return;
+    }
+
+    const row = document.createElement('div');
+    row.className = 'desc_row';
+    row.dataset.task = task.task_number;
+    row.innerHTML = `
+        <div class="desc_label">Задание ${task.task_number}</div>
+        <input class="desc_input" type="text" value="${escapeAttr(value)}">
+        <button type="button" class="save-desc-btn" data-task="${task.task_number}">Отправить</button>
+        <span class="flash_ok"></span>
+    `;
+
+    const rows = [...descriptionList.querySelectorAll('.desc_row')];
+    let inserted = false;
+
+    for (const current of rows) {
+        const currentTask = Number(current.dataset.task);
+        if (Number(task.task_number) < currentTask) {
+            descriptionList.insertBefore(row, current);
+            inserted = true;
+            break;
+        }
+    }
+
+    if (!inserted) {
+        descriptionList.appendChild(row);
+    }
+}
+
+descriptionList.addEventListener('click', async function (e) {
+    const btn = e.target.closest('.save-desc-btn');
+    if (!btn) return;
+
+    const row = btn.closest('.desc_row');
+    const input = row.querySelector('.desc_input');
+    const flash = row.querySelector('.flash_ok');
+    const task = btn.dataset.task;
+
+    try {
+        const response = await fetch('/save-task-text', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                task_number: task,
+                text: input.value
+            })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            alert(data.error || 'Не удалось сохранить ответ');
+            return;
+        }
+
+        state.answers[String(task)] = data.text;
+        flash.textContent = 'Сохранено';
+        setTimeout(function () {
+            flash.textContent = '';
+        }, 1200);
+    } catch (e2) {
+        alert('Не удалось сохранить ответ');
+    }
+});
+
+fileList.addEventListener('click', async function (e) {
+    const btn = e.target.closest('.delete-btn');
+    if (!btn) return;
+
+    const task = btn.dataset.task;
+
+    try {
+        const response = await fetch(`/delete/${encodeURIComponent(task)}`, {
+            method: 'POST'
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            alert(data.error || 'Не удалось удалить файл');
+            return;
+        }
+
+        const row = fileList.querySelector(`.file_row[data-task="${CSS.escape(String(task))}"]`);
+        if (row) row.remove();
+
+        const descRow = descriptionList.querySelector(`.desc_row[data-task="${CSS.escape(String(task))}"]`);
+        if (descRow) descRow.remove();
+
+        delete state.answers[String(task)];
+
+        if (!fileList.querySelector('.file_row')) {
+            fileList.innerHTML = '<div class="empty_files" id="emptyState">Файлов пока нет.</div>';
+        }
+
+        if (!descriptionList.querySelector('.desc_row')) {
+            descriptionList.innerHTML = '<div class="empty_files" id="emptyDescription">Файлов пока нет.</div>';
+        }
+    } catch (e2) {
+        alert('Не удалось удалить файл');
+    }
+});
+
+function div(val, by) {
+    return (val - val % by) / by;
+}
+
+function updateTimer() {
+    const now = Math.floor(Date.now() / 1000);
+    let left = finishTimestamp - now;
+    const expired = left < 0;
+
+    left = Math.abs(left);
+    let mm = div(left, 60);
+    let ss = left % 60;
+
+    if (ss < 10) ss = '0' + ss;
+
+    const topline = document.getElementById('topline');
+
+    if (!expired) {
+        if (mm < 5) {
+            topline.innerHTML = '<font color="#aa0000">Оставшееся время - ' + mm + ':' + ss + '</font>';
+        } else {
+            topline.innerHTML = '<font>Оставшееся время - ' + mm + ':' + ss + '</font>';
+        }
+    } else {
+        topline.innerHTML = '<font>‼️ <b style="color:red">Время закончилось</b> - ' + mm + ':' + ss + '</font>';
+    }
+}
+
+function escapeHtml(value) {
+    return String(value)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+}
+
+function escapeAttr(value) {
+    return escapeHtml(value);
+}
+
+updateTimer();
+setInterval(updateTimer, 500);
+</script>
+</body>
+</html>
