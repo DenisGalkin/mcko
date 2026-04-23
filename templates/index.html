@@ -95,6 +95,7 @@
                 <button type="button" id="pickBtn">Выбрать файл</button>
                 <input type="file" id="fileInput" hidden>
             </div>
+            <div class="upload_notice" id="uploadNotice" aria-live="polite"></div>
         </div>
     </div>
 
@@ -157,9 +158,11 @@ const descriptionBtn = document.getElementById('descriptionBtn');
 const dropZone = document.getElementById('dropZone');
 const pickBtn = document.getElementById('pickBtn');
 const fileInput = document.getElementById('fileInput');
+const uploadNotice = document.getElementById('uploadNotice');
 const fileList = document.getElementById('fileList');
 const descriptionList = document.getElementById('descriptionList');
 const answerInput = document.getElementById('a0');
+const answerPanel = document.querySelector('.answer_flex');
 
 const state = {
     answers: { ...initialAnswers }
@@ -167,6 +170,14 @@ const state = {
 
 answerInput.addEventListener('input', function () {
     CheckInt(this);
+});
+
+answerPanel.addEventListener('click', function () {
+    hideExpandedPanels();
+});
+
+answerInput.addEventListener('click', function (e) {
+    e.stopPropagation();
 });
 
 saveAnswerBtn.addEventListener('click', function () {
@@ -248,6 +259,7 @@ async function uploadFile(file) {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('task_number', answerInput.value.trim());
+    showUploadNotice('Загрузка...');
 
     try {
         const response = await fetch('/upload', {
@@ -257,6 +269,7 @@ async function uploadFile(file) {
         const data = await response.json();
 
         if (!response.ok || !data.ok) {
+            clearUploadNotice();
             alert(data.error || 'Не удалось загрузить файл');
             return;
         }
@@ -265,8 +278,46 @@ async function uploadFile(file) {
         upsertDescriptionRow(data.task);
         state.answers[String(data.task.task_number)] = data.task.answer_text || '';
         fileInput.value = '';
+        showUploadNotice('Готово', 1200);
     } catch (e) {
+        clearUploadNotice();
         alert('Не удалось загрузить файл');
+    }
+}
+
+function hideExpandedPanels() {
+    uploadWrapper.style.display = 'none';
+    uploadBox.style.display = 'none';
+    filesWrapper.style.display = 'none';
+    filesPanel.style.display = 'none';
+    descriptionWrapper.style.display = 'none';
+    descriptionPanel.style.display = 'none';
+}
+
+let uploadNoticeTimer = null;
+
+function showUploadNotice(text, timeout) {
+    uploadNotice.textContent = text;
+    uploadNotice.classList.add('visible');
+
+    if (uploadNoticeTimer) {
+        clearTimeout(uploadNoticeTimer);
+        uploadNoticeTimer = null;
+    }
+
+    if (timeout) {
+        uploadNoticeTimer = setTimeout(function () {
+            clearUploadNotice();
+        }, timeout);
+    }
+}
+
+function clearUploadNotice() {
+    uploadNotice.textContent = '';
+    uploadNotice.classList.remove('visible');
+    if (uploadNoticeTimer) {
+        clearTimeout(uploadNoticeTimer);
+        uploadNoticeTimer = null;
     }
 }
 

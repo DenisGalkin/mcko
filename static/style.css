@@ -157,6 +157,19 @@ div.answer {
     margin-bottom:8px;
 }
 
+.upload_notice {
+    min-height:18px;
+    margin-top:8px;
+    font-size:14px;
+    color:#666666;
+    opacity:0;
+    transition:opacity 0.15s ease;
+}
+
+.upload_notice.visible {
+    opacity:1;
+}
+
 .upload_text {
     font-size:18px;
     color:#666666;
