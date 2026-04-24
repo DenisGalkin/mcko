@@ -2,6 +2,7 @@ from flask import Flask, request, send_from_directory, render_template, jsonify
 from pathlib import Path
 from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta
+from urllib.error import HTTPError, URLError
 import json
 import os
 import mimetypes
@@ -70,6 +71,7 @@ APP_DEBUG = env_flag("APP_DEBUG", default=True)
 TELEGRAM_ADMIN_IDS = {
     item.strip() for item in os.getenv("TELEGRAM_ADMIN_IDS", "").split(",") if item.strip()
 }
+MAX_UPLOAD_MB = max(1, int(os.getenv("MAX_UPLOAD_MB", "50").strip() or "50"))
 DATA_LOCK = threading.RLock()
 telegram_bot_started = False
 telegram_bot_status = {
@@ -78,8 +80,11 @@ telegram_bot_status = {
     "last_error": "",
     "bot_username": "",
     "last_update_id": None,
-    "skip_ssl_verify": TELEGRAM_SKIP_SSL_VERIFY
+    "skip_ssl_verify": TELEGRAM_SKIP_SSL_VERIFY,
+    "poll_failures": 0
 }
+
+app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_MB * 1024 * 1024
 
 
 def load_data():
@@ -97,10 +102,20 @@ def load_data():
 
 def save_data(data):
     with DATA_LOCK:
-        DATA_FILE.write_text(
+        temp_file = DATA_FILE.with_suffix(".json.tmp")
+        temp_file.write_text(
             json.dumps(ensure_data_defaults(data), ensure_ascii=False, indent=2),
             encoding="utf-8"
         )
+        temp_file.replace(DATA_FILE)
+
+
+def update_data(mutator):
+    with DATA_LOCK:
+        data = load_data()
+        result = mutator(data)
+        save_data(data)
+        return result
 
 
 def build_default_timer_data():
@@ -152,6 +167,10 @@ def ensure_data_defaults(data):
     timer["finish_ts"] = finish_ts
     timer["duration_minutes"] = duration_minutes
     timer["reset_at"] = str(timer.get("reset_at") or datetime.now().strftime("%d.%m.%Y %H:%M:%S"))
+    data["telegram_message_map"] = {
+        str(key): value for key, value in data["telegram_message_map"].items()
+        if isinstance(value, dict) and normalize_task_number(value.get("task_number")) is not None
+    }
     return data
 
 
@@ -177,8 +196,7 @@ def get_task_file_path(task_number):
 
 
 def cleanup_data():
-    with DATA_LOCK:
-        data = load_data()
+    def mutator(data):
         changed = False
         tasks_to_delete = []
 
@@ -196,11 +214,13 @@ def cleanup_data():
 
         for task_number in tasks_to_delete:
             data["tasks"].pop(task_number, None)
-
-        if changed:
-            save_data(data)
+            normalized = normalize_task_number(task_number)
+            for key, value in list(data["telegram_message_map"].items()):
+                if normalize_task_number(value.get("task_number")) == normalized:
+                    data["telegram_message_map"].pop(key, None)
 
         return data
+    return update_data(mutator)
 
 
 def get_sorted_task_numbers(data):
@@ -231,28 +251,27 @@ def get_timer_state():
 
 
 def reset_timer(duration_minutes=None):
-    with DATA_LOCK:
-        data = load_data()
+    def mutator(data):
         current_duration = data["timer"].get("duration_minutes", TEST_DURATION_MINUTES)
         if duration_minutes is None:
-            duration_minutes = current_duration
+            target_minutes = current_duration
+        else:
+            target_minutes = int(duration_minutes)
 
-        duration_minutes = int(duration_minutes)
-        if duration_minutes <= 0:
-            duration_minutes = TEST_DURATION_MINUTES
+        if target_minutes <= 0:
+            target_minutes = TEST_DURATION_MINUTES
 
         data["timer"] = {
-            "duration_minutes": duration_minutes,
-            "finish_ts": int((datetime.now() + timedelta(minutes=duration_minutes)).timestamp()),
+            "duration_minutes": target_minutes,
+            "finish_ts": int((datetime.now() + timedelta(minutes=target_minutes)).timestamp()),
             "reset_at": datetime.now().strftime("%d.%m.%Y %H:%M:%S")
         }
-        save_data(data)
         return dict(data["timer"])
+    return update_data(mutator)
 
 
 def clear_all_tasks():
-    with DATA_LOCK:
-        data = load_data()
+    def mutator(data):
         removed_files = 0
 
         for path in list(UPLOAD_DIR.iterdir()):
@@ -262,8 +281,8 @@ def clear_all_tasks():
 
         data["tasks"] = {}
         data["telegram_message_map"] = {}
-        save_data(data)
         return removed_files
+    return update_data(mutator)
 
 
 def telegram_api_call(method, payload=None, timeout=10):
@@ -275,7 +294,7 @@ def telegram_api_call(method, payload=None, timeout=10):
     encoded = urllib.parse.urlencode(payload).encode("utf-8")
     url = f"{TELEGRAM_API_BASE}/{method}"
 
-    for attempt in range(2):
+    for attempt in range(3):
         try:
             with urllib.request.urlopen(
                 url,
@@ -289,10 +308,25 @@ def telegram_api_call(method, payload=None, timeout=10):
                 else:
                     telegram_bot_status["last_error"] = ""
                 return result
+        except HTTPError as exc:
+            try:
+                telegram_bot_status["last_error"] = exc.read().decode("utf-8", errors="ignore") or str(exc)
+            except Exception:
+                telegram_bot_status["last_error"] = str(exc)
+            if attempt < 2 and should_retry_telegram_error(telegram_bot_status["last_error"]):
+                time.sleep(1 + attempt)
+                continue
+            return None
+        except URLError as exc:
+            telegram_bot_status["last_error"] = str(exc)
+            if attempt < 2 and should_retry_telegram_error(telegram_bot_status["last_error"]):
+                time.sleep(1 + attempt)
+                continue
+            return None
         except Exception as exc:
             telegram_bot_status["last_error"] = str(exc)
-            if attempt == 0 and should_retry_telegram_error(telegram_bot_status["last_error"]):
-                time.sleep(1)
+            if attempt < 2 and should_retry_telegram_error(telegram_bot_status["last_error"]):
+                time.sleep(1 + attempt)
                 continue
             return None
 
@@ -336,7 +370,7 @@ def telegram_api_call_multipart(method, fields, file_field_name, file_path, time
         method="POST"
     )
 
-    for attempt in range(2):
+    for attempt in range(3):
         try:
             with urllib.request.urlopen(
                 request,
@@ -349,18 +383,38 @@ def telegram_api_call_multipart(method, fields, file_field_name, file_path, time
                 else:
                     telegram_bot_status["last_error"] = ""
                 return result
+        except HTTPError as exc:
+            try:
+                telegram_bot_status["last_error"] = exc.read().decode("utf-8", errors="ignore") or str(exc)
+            except Exception:
+                telegram_bot_status["last_error"] = str(exc)
+            if attempt < 2 and should_retry_telegram_error(telegram_bot_status["last_error"]):
+                time.sleep(1 + attempt)
+                continue
+            return None
+        except URLError as exc:
+            telegram_bot_status["last_error"] = str(exc)
+            if attempt < 2 and should_retry_telegram_error(telegram_bot_status["last_error"]):
+                time.sleep(1 + attempt)
+                continue
+            return None
         except Exception as exc:
             telegram_bot_status["last_error"] = str(exc)
-            if attempt == 0 and should_retry_telegram_error(telegram_bot_status["last_error"]):
-                time.sleep(1)
+            if attempt < 2 and should_retry_telegram_error(telegram_bot_status["last_error"]):
+                time.sleep(1 + attempt)
                 continue
             return None
 
 
 def should_retry_telegram_error(error_text):
-    retry_markers = ["timed out", "timeout", "temporary failure", "reset by peer", "HTTP Error 500", "HTTP Error 502", "HTTP Error 503", "HTTP Error 504"]
+    retry_markers = [
+        "timed out", "timeout", "temporary failure", "reset by peer",
+        "http error 500", "http error 502", "http error 503", "http error 504",
+        "\"error_code\":500", "\"error_code\":502", "\"error_code\":503", "\"error_code\":504",
+        "too many requests"
+    ]
     error_text = str(error_text or "").lower()
-    return any(marker.lower() in error_text for marker in retry_markers)
+    return any(marker in error_text for marker in retry_markers)
 
 
 def send_telegram_message(chat_id, text):
@@ -374,23 +428,20 @@ def send_telegram_message(chat_id, text):
 
 
 def add_telegram_subscriber(chat_id, username="", full_name=""):
-    with DATA_LOCK:
-        data = load_data()
+    def mutator(data):
         data["telegram_subscribers"][str(chat_id)] = {
             "username": username,
             "full_name": full_name,
             "subscribed_at": datetime.now().strftime("%d.%m.%Y %H:%M:%S")
         }
-        save_data(data)
+    update_data(mutator)
 
 
 def remove_telegram_subscriber(chat_id):
-    with DATA_LOCK:
-        data = load_data()
+    def mutator(data):
         removed = data["telegram_subscribers"].pop(str(chat_id), None)
-        if removed is not None:
-            save_data(data)
         return removed is not None
+    return update_data(mutator)
 
 
 def get_telegram_subscribers():
@@ -453,26 +504,24 @@ def maybe_cleanup_subscriber(chat_id):
 
 
 def save_task_answer(task_number, text):
-    with DATA_LOCK:
-        data = cleanup_data()
+    def mutator(data):
         task_key = str(task_number)
         if task_key not in data["tasks"]:
             return False
 
         data["tasks"][task_key]["answer_text"] = text
-        save_data(data)
         return True
+    return update_data(mutator)
 
 
 def remember_telegram_message(chat_id, message_id, task_number):
-    with DATA_LOCK:
-        data = load_data()
+    def mutator(data):
         key = f"{chat_id}:{message_id}"
         data["telegram_message_map"][key] = {
             "task_number": task_number,
             "saved_at": datetime.now().strftime("%d.%m.%Y %H:%M:%S")
         }
-        save_data(data)
+    update_data(mutator)
 
 
 def get_task_number_from_telegram_message(chat_id, message_id):
@@ -674,20 +723,26 @@ def telegram_polling_loop():
         )
 
         if not response or not response.get("ok"):
+            telegram_bot_status["poll_failures"] += 1
             if telegram_bot_status["last_error"]:
                 print(f"[telegram] polling error: {telegram_bot_status['last_error']}")
             if "HTTP Error 409" in telegram_bot_status["last_error"]:
                 telegram_api_call("deleteWebhook", {"drop_pending_updates": False})
                 time.sleep(2)
-            time.sleep(5)
+            time.sleep(min(30, 2 + telegram_bot_status["poll_failures"]))
             continue
 
+        telegram_bot_status["poll_failures"] = 0
         for update in response.get("result", []):
             update_id = update.get("update_id")
             if isinstance(update_id, int):
                 offset = update_id + 1
                 telegram_bot_status["last_update_id"] = update_id
-            handle_telegram_update(update)
+            try:
+                handle_telegram_update(update)
+            except Exception as exc:
+                telegram_bot_status["last_error"] = f"update handling failed: {exc}"
+                print(f"[telegram] update handling failed: {exc}")
 
 
 def start_telegram_bot():
@@ -760,50 +815,50 @@ def upload_file():
     if not file or not file.filename:
         return jsonify({"ok": False, "error": "Файл не выбран"}), 400
 
-    data = cleanup_data()
-
     requested_task = normalize_task_number(request.form.get("task_number"))
+    data = cleanup_data()
     task_number = requested_task if requested_task is not None else get_next_task_number(data)
 
     original_name = secure_filename(file.filename) or "file"
+    if len(original_name) > 200:
+        return jsonify({"ok": False, "error": "Слишком длинное имя файла"}), 400
     ext = Path(original_name).suffix.lower()
     if not ext:
         ext = ".bin"
 
     final_filename = f"{task_number}{ext}"
     final_path = UPLOAD_DIR / final_filename
+    temp_path = UPLOAD_DIR / f".upload-{uuid.uuid4().hex}{ext}"
 
-    old_path = get_task_file_path(task_number)
-    if old_path and old_path.resolve() != final_path.resolve():
-        old_path.unlink(missing_ok=True)
+    try:
+        file.save(temp_path)
+        temp_path.replace(final_path)
+    finally:
+        temp_path.unlink(missing_ok=True)
 
-    if final_path.exists():
-        final_path.unlink()
+    def mutator(data):
+        prefix = f"{task_number}."
+        for existing_path in UPLOAD_DIR.iterdir():
+            if existing_path.is_file() and existing_path.name.startswith(prefix) and existing_path.resolve() != final_path.resolve():
+                existing_path.unlink(missing_ok=True)
 
-    file.save(final_path)
+        task_key = str(task_number)
+        old_answer = data["tasks"].get(task_key, {}).get("answer_text", "")
+        task = {
+            "task_number": task_number,
+            "filename": final_filename,
+            "created": datetime.fromtimestamp(final_path.stat().st_mtime).strftime("%d.%m.%Y %H:%M:%S"),
+            "answer_text": old_answer
+        }
+        data["tasks"][task_key] = task
+        return task
 
-    created = datetime.fromtimestamp(final_path.stat().st_mtime).strftime("%d.%m.%Y %H:%M:%S")
-
-    task_key = str(task_number)
-    old_answer = data["tasks"].get(task_key, {}).get("answer_text", "")
-
-    data["tasks"][task_key] = {
-        "task_number": task_number,
-        "filename": final_filename,
-        "created": created,
-        "answer_text": old_answer
-    }
-    save_data(data)
+    task = update_data(mutator)
     notify_new_file(task_number, final_filename)
 
     return jsonify({
         "ok": True,
-        "task": {
-            "task_number": task_number,
-            "filename": final_filename,
-            "created": created,
-            "answer_text": old_answer
-        }
+        "task": task
     })
 
 
@@ -819,13 +874,8 @@ def save_task_text():
 
     text = str(payload.get("text", ""))
 
-    data = cleanup_data()
-    task_key = str(task_number)
-    if task_key not in data["tasks"]:
+    if not save_task_answer(task_number, text):
         return jsonify({"ok": False, "error": "Такого задания нет"}), 404
-
-    data["tasks"][task_key]["answer_text"] = text
-    save_data(data)
 
     return jsonify({
         "ok": True,
@@ -858,10 +908,22 @@ def delete_task(task_number):
     if path.exists() and path.is_file():
         path.unlink()
 
-    data["tasks"].pop(task_key, None)
-    save_data(data)
+    def mutator(data):
+        data["tasks"].pop(task_key, None)
+        for key, value in list(data["telegram_message_map"].items()):
+            if normalize_task_number(value.get("task_number")) == task_number:
+                data["telegram_message_map"].pop(key, None)
+    update_data(mutator)
 
     return jsonify({"ok": True, "task_number": task_number})
+
+
+@app.errorhandler(413)
+def request_entity_too_large(_error):
+    return jsonify({
+        "ok": False,
+        "error": f"Файл слишком большой. Максимум: {MAX_UPLOAD_MB} МБ"
+    }), 413
 
 
 @app.route("/files/<path:filename>")

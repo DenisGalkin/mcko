@@ -165,7 +165,10 @@ const answerInput = document.getElementById('a0');
 const answerPanel = document.querySelector('.answer_flex');
 
 const state = {
-    answers: { ...initialAnswers }
+    answers: { ...initialAnswers },
+    uploadInProgress: false,
+    saveInProgress: false,
+    deleteInProgress: false
 };
 
 answerInput.addEventListener('input', function () {
@@ -256,17 +259,22 @@ document.addEventListener('paste', function (e) {
 });
 
 async function uploadFile(file) {
+    if (state.uploadInProgress) {
+        showUploadNotice('Подождите, предыдущая загрузка еще идет', 1500);
+        return;
+    }
+
+    state.uploadInProgress = true;
     const formData = new FormData();
     formData.append('file', file);
     formData.append('task_number', answerInput.value.trim());
     showUploadNotice('Загрузка...');
 
     try {
-        const response = await fetch('/upload', {
+        const { response, data } = await fetchJSON('/upload', {
             method: 'POST',
             body: formData
         });
-        const data = await response.json();
 
         if (!response.ok || !data.ok) {
             clearUploadNotice();
@@ -281,7 +289,9 @@ async function uploadFile(file) {
         showUploadNotice('Готово', 1200);
     } catch (e) {
         clearUploadNotice();
-        alert('Не удалось загрузить файл');
+        alert(e.message || 'Не удалось загрузить файл');
+    } finally {
+        state.uploadInProgress = false;
     }
 }
 
@@ -403,15 +413,17 @@ function upsertDescriptionRow(task) {
 
 descriptionList.addEventListener('click', async function (e) {
     const btn = e.target.closest('.save-desc-btn');
-    if (!btn) return;
+    if (!btn || state.saveInProgress) return;
 
     const row = btn.closest('.desc_row');
     const input = row.querySelector('.desc_input');
     const flash = row.querySelector('.flash_ok');
     const task = btn.dataset.task;
+    state.saveInProgress = true;
+    btn.disabled = true;
 
     try {
-        const response = await fetch('/save-task-text', {
+        const { response, data } = await fetchJSON('/save-task-text', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -419,8 +431,6 @@ descriptionList.addEventListener('click', async function (e) {
                 text: input.value
             })
         });
-
-        const data = await response.json();
 
         if (!response.ok || !data.ok) {
             alert(data.error || 'Не удалось сохранить ответ');
@@ -433,21 +443,25 @@ descriptionList.addEventListener('click', async function (e) {
             flash.textContent = '';
         }, 1200);
     } catch (e2) {
-        alert('Не удалось сохранить ответ');
+        alert(e2.message || 'Не удалось сохранить ответ');
+    } finally {
+        btn.disabled = false;
+        state.saveInProgress = false;
     }
 });
 
 fileList.addEventListener('click', async function (e) {
     const btn = e.target.closest('.delete-btn');
-    if (!btn) return;
+    if (!btn || state.deleteInProgress) return;
 
     const task = btn.dataset.task;
+    state.deleteInProgress = true;
+    btn.disabled = true;
 
     try {
-        const response = await fetch(`/delete/${encodeURIComponent(task)}`, {
+        const { response, data } = await fetchJSON(`/delete/${encodeURIComponent(task)}`, {
             method: 'POST'
         });
-        const data = await response.json();
 
         if (!response.ok || !data.ok) {
             alert(data.error || 'Не удалось удалить файл');
@@ -470,7 +484,10 @@ fileList.addEventListener('click', async function (e) {
             descriptionList.innerHTML = '<div class="empty_files" id="emptyDescription">Файлов пока нет.</div>';
         }
     } catch (e2) {
-        alert('Не удалось удалить файл');
+        alert(e2.message || 'Не удалось удалить файл');
+    } finally {
+        btn.disabled = false;
+        state.deleteInProgress = false;
     }
 });
 
@@ -504,14 +521,31 @@ function updateTimer() {
 
 async function syncTimerStatus() {
     try {
-        const response = await fetch('/timer-status', { cache: 'no-store' });
-        const data = await response.json();
+        const { response, data } = await fetchJSON('/timer-status', { cache: 'no-store' });
         if (response.ok && data.ok && data.timer && Number.isFinite(Number(data.timer.finish_ts))) {
             finishTimestamp = Number(data.timer.finish_ts);
         }
     } catch (e) {
         // Ignore temporary timer sync errors and keep local countdown running.
     }
+}
+
+async function fetchJSON(url, options) {
+    const response = await fetch(url, options);
+    const contentType = response.headers.get('content-type') || '';
+    let data = null;
+
+    if (contentType.includes('application/json')) {
+        data = await response.json();
+    } else {
+        const text = await response.text();
+        data = {
+            ok: response.ok,
+            error: text && text.trim() ? text.trim() : 'Сервер вернул неожиданный ответ'
+        };
+    }
+
+    return { response, data };
 }
 
 function escapeHtml(value) {
