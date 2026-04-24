@@ -134,7 +134,7 @@
 </center>
 
 <script>
-const finishTimestamp = {{ finish_ts }};
+let finishTimestamp = {{ finish_ts }};
 const initialAnswers = {{ answers_map|tojson }};
 
 function CheckInt(element) {
@@ -502,6 +502,18 @@ function updateTimer() {
     }
 }
 
+async function syncTimerStatus() {
+    try {
+        const response = await fetch('/timer-status', { cache: 'no-store' });
+        const data = await response.json();
+        if (response.ok && data.ok && data.timer && Number.isFinite(Number(data.timer.finish_ts))) {
+            finishTimestamp = Number(data.timer.finish_ts);
+        }
+    } catch (e) {
+        // Ignore temporary timer sync errors and keep local countdown running.
+    }
+}
+
 function escapeHtml(value) {
     return String(value)
         .replaceAll('&', '&amp;')
@@ -517,6 +529,14 @@ function escapeAttr(value) {
 
 updateTimer();
 setInterval(updateTimer, 500);
+syncTimerStatus();
+setInterval(syncTimerStatus, 10000);
+
+document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) {
+        syncTimerStatus();
+    }
+});
 </script>
 </body>
 </html>

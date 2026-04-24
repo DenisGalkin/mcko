@@ -61,14 +61,16 @@ def env_flag(name, default=False):
     return str(value).strip().lower() in {"1", "true", "yes", "on"}
 
 TEST_DURATION_MINUTES = 44
-START_TIME = datetime.now()
-FINISH_TIME = START_TIME + timedelta(minutes=TEST_DURATION_MINUTES)
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 TELEGRAM_API_BASE = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}" if TELEGRAM_BOT_TOKEN else ""
 TELEGRAM_POLL_TIMEOUT = 30
 TELEGRAM_SKIP_SSL_VERIFY = env_flag("TELEGRAM_SKIP_SSL_VERIFY", default=False)
 TELEGRAM_SSL_CONTEXT = ssl._create_unverified_context() if TELEGRAM_SKIP_SSL_VERIFY else None
 APP_DEBUG = env_flag("APP_DEBUG", default=True)
+TELEGRAM_ADMIN_IDS = {
+    item.strip() for item in os.getenv("TELEGRAM_ADMIN_IDS", "").split(",") if item.strip()
+}
+DATA_LOCK = threading.RLock()
 telegram_bot_started = False
 telegram_bot_status = {
     "enabled": bool(TELEGRAM_BOT_TOKEN),
@@ -81,28 +83,76 @@ telegram_bot_status = {
 
 
 def load_data():
-    if not DATA_FILE.exists():
-        return {"tasks": {}, "telegram_subscribers": {}, "telegram_message_map": {}}
-    try:
-        data = json.loads(DATA_FILE.read_text(encoding="utf-8"))
-    except Exception:
-        return {"tasks": {}, "telegram_subscribers": {}, "telegram_message_map": {}}
-    if not isinstance(data, dict):
-        return {"tasks": {}, "telegram_subscribers": {}, "telegram_message_map": {}}
+    with DATA_LOCK:
+        if not DATA_FILE.exists():
+            return build_default_data()
+        try:
+            data = json.loads(DATA_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            return build_default_data()
+        if not isinstance(data, dict):
+            return build_default_data()
+        return ensure_data_defaults(data)
+
+
+def save_data(data):
+    with DATA_LOCK:
+        DATA_FILE.write_text(
+            json.dumps(ensure_data_defaults(data), ensure_ascii=False, indent=2),
+            encoding="utf-8"
+        )
+
+
+def build_default_timer_data():
+    finish_ts = int((datetime.now() + timedelta(minutes=TEST_DURATION_MINUTES)).timestamp())
+    return {
+        "duration_minutes": TEST_DURATION_MINUTES,
+        "finish_ts": finish_ts,
+        "reset_at": datetime.now().strftime("%d.%m.%Y %H:%M:%S")
+    }
+
+
+def build_default_data():
+    return {
+        "tasks": {},
+        "telegram_subscribers": {},
+        "telegram_message_map": {},
+        "timer": build_default_timer_data()
+    }
+
+
+def ensure_data_defaults(data):
     if "tasks" not in data or not isinstance(data["tasks"], dict):
         data["tasks"] = {}
     if "telegram_subscribers" not in data or not isinstance(data["telegram_subscribers"], dict):
         data["telegram_subscribers"] = {}
     if "telegram_message_map" not in data or not isinstance(data["telegram_message_map"], dict):
         data["telegram_message_map"] = {}
+    if "timer" not in data or not isinstance(data["timer"], dict):
+        data["timer"] = build_default_timer_data()
+
+    timer = data["timer"]
+    finish_ts = timer.get("finish_ts")
+    duration_minutes = timer.get("duration_minutes")
+
+    if not isinstance(finish_ts, int):
+        try:
+            finish_ts = int(finish_ts)
+        except Exception:
+            finish_ts = build_default_timer_data()["finish_ts"]
+    if not isinstance(duration_minutes, int):
+        try:
+            duration_minutes = int(duration_minutes)
+        except Exception:
+            duration_minutes = TEST_DURATION_MINUTES
+
+    if duration_minutes <= 0:
+        duration_minutes = TEST_DURATION_MINUTES
+
+    timer["finish_ts"] = finish_ts
+    timer["duration_minutes"] = duration_minutes
+    timer["reset_at"] = str(timer.get("reset_at") or datetime.now().strftime("%d.%m.%Y %H:%M:%S"))
     return data
-
-
-def save_data(data):
-    DATA_FILE.write_text(
-        json.dumps(data, ensure_ascii=False, indent=2),
-        encoding="utf-8"
-    )
 
 
 def normalize_task_number(raw_value):
@@ -127,29 +177,30 @@ def get_task_file_path(task_number):
 
 
 def cleanup_data():
-    data = load_data()
-    changed = False
-    tasks_to_delete = []
+    with DATA_LOCK:
+        data = load_data()
+        changed = False
+        tasks_to_delete = []
 
-    for task_number, item in data["tasks"].items():
-        filename = item.get("filename", "")
-        if not filename:
-            tasks_to_delete.append(task_number)
-            changed = True
-            continue
+        for task_number, item in data["tasks"].items():
+            filename = item.get("filename", "")
+            if not filename:
+                tasks_to_delete.append(task_number)
+                changed = True
+                continue
 
-        path = UPLOAD_DIR / filename
-        if not path.is_file():
-            tasks_to_delete.append(task_number)
-            changed = True
+            path = UPLOAD_DIR / filename
+            if not path.is_file():
+                tasks_to_delete.append(task_number)
+                changed = True
 
-    for task_number in tasks_to_delete:
-        data["tasks"].pop(task_number, None)
+        for task_number in tasks_to_delete:
+            data["tasks"].pop(task_number, None)
 
-    if changed:
-        save_data(data)
+        if changed:
+            save_data(data)
 
-    return data
+        return data
 
 
 def get_sorted_task_numbers(data):
@@ -174,6 +225,47 @@ def build_tasks_for_template(data):
     return tasks
 
 
+def get_timer_state():
+    data = load_data()
+    return dict(data["timer"])
+
+
+def reset_timer(duration_minutes=None):
+    with DATA_LOCK:
+        data = load_data()
+        current_duration = data["timer"].get("duration_minutes", TEST_DURATION_MINUTES)
+        if duration_minutes is None:
+            duration_minutes = current_duration
+
+        duration_minutes = int(duration_minutes)
+        if duration_minutes <= 0:
+            duration_minutes = TEST_DURATION_MINUTES
+
+        data["timer"] = {
+            "duration_minutes": duration_minutes,
+            "finish_ts": int((datetime.now() + timedelta(minutes=duration_minutes)).timestamp()),
+            "reset_at": datetime.now().strftime("%d.%m.%Y %H:%M:%S")
+        }
+        save_data(data)
+        return dict(data["timer"])
+
+
+def clear_all_tasks():
+    with DATA_LOCK:
+        data = load_data()
+        removed_files = 0
+
+        for path in list(UPLOAD_DIR.iterdir()):
+            if path.is_file():
+                path.unlink(missing_ok=True)
+                removed_files += 1
+
+        data["tasks"] = {}
+        data["telegram_message_map"] = {}
+        save_data(data)
+        return removed_files
+
+
 def telegram_api_call(method, payload=None, timeout=10):
     if not TELEGRAM_API_BASE:
         telegram_bot_status["last_error"] = "TELEGRAM_BOT_TOKEN is empty"
@@ -183,22 +275,26 @@ def telegram_api_call(method, payload=None, timeout=10):
     encoded = urllib.parse.urlencode(payload).encode("utf-8")
     url = f"{TELEGRAM_API_BASE}/{method}"
 
-    try:
-        with urllib.request.urlopen(
-            url,
-            data=encoded,
-            timeout=timeout,
-            context=TELEGRAM_SSL_CONTEXT
-        ) as response:
-            result = json.loads(response.read().decode("utf-8"))
-            if not result.get("ok"):
-                telegram_bot_status["last_error"] = str(result.get("description", "Telegram API error"))
-            else:
-                telegram_bot_status["last_error"] = ""
-            return result
-    except Exception as exc:
-        telegram_bot_status["last_error"] = str(exc)
-        return None
+    for attempt in range(2):
+        try:
+            with urllib.request.urlopen(
+                url,
+                data=encoded,
+                timeout=timeout,
+                context=TELEGRAM_SSL_CONTEXT
+            ) as response:
+                result = json.loads(response.read().decode("utf-8"))
+                if not result.get("ok"):
+                    telegram_bot_status["last_error"] = str(result.get("description", "Telegram API error"))
+                else:
+                    telegram_bot_status["last_error"] = ""
+                return result
+        except Exception as exc:
+            telegram_bot_status["last_error"] = str(exc)
+            if attempt == 0 and should_retry_telegram_error(telegram_bot_status["last_error"]):
+                time.sleep(1)
+                continue
+            return None
 
 
 def telegram_api_call_multipart(method, fields, file_field_name, file_path, timeout=30):
@@ -240,21 +336,31 @@ def telegram_api_call_multipart(method, fields, file_field_name, file_path, time
         method="POST"
     )
 
-    try:
-        with urllib.request.urlopen(
-            request,
-            timeout=timeout,
-            context=TELEGRAM_SSL_CONTEXT
-        ) as response:
-            result = json.loads(response.read().decode("utf-8"))
-            if not result.get("ok"):
-                telegram_bot_status["last_error"] = str(result.get("description", "Telegram API error"))
-            else:
-                telegram_bot_status["last_error"] = ""
-            return result
-    except Exception as exc:
-        telegram_bot_status["last_error"] = str(exc)
-        return None
+    for attempt in range(2):
+        try:
+            with urllib.request.urlopen(
+                request,
+                timeout=timeout,
+                context=TELEGRAM_SSL_CONTEXT
+            ) as response:
+                result = json.loads(response.read().decode("utf-8"))
+                if not result.get("ok"):
+                    telegram_bot_status["last_error"] = str(result.get("description", "Telegram API error"))
+                else:
+                    telegram_bot_status["last_error"] = ""
+                return result
+        except Exception as exc:
+            telegram_bot_status["last_error"] = str(exc)
+            if attempt == 0 and should_retry_telegram_error(telegram_bot_status["last_error"]):
+                time.sleep(1)
+                continue
+            return None
+
+
+def should_retry_telegram_error(error_text):
+    retry_markers = ["timed out", "timeout", "temporary failure", "reset by peer", "HTTP Error 500", "HTTP Error 502", "HTTP Error 503", "HTTP Error 504"]
+    error_text = str(error_text or "").lower()
+    return any(marker.lower() in error_text for marker in retry_markers)
 
 
 def send_telegram_message(chat_id, text):
@@ -268,21 +374,23 @@ def send_telegram_message(chat_id, text):
 
 
 def add_telegram_subscriber(chat_id, username="", full_name=""):
-    data = load_data()
-    data["telegram_subscribers"][str(chat_id)] = {
-        "username": username,
-        "full_name": full_name,
-        "subscribed_at": datetime.now().strftime("%d.%m.%Y %H:%M:%S")
-    }
-    save_data(data)
+    with DATA_LOCK:
+        data = load_data()
+        data["telegram_subscribers"][str(chat_id)] = {
+            "username": username,
+            "full_name": full_name,
+            "subscribed_at": datetime.now().strftime("%d.%m.%Y %H:%M:%S")
+        }
+        save_data(data)
 
 
 def remove_telegram_subscriber(chat_id):
-    data = load_data()
-    removed = data["telegram_subscribers"].pop(str(chat_id), None)
-    if removed is not None:
-        save_data(data)
-    return removed is not None
+    with DATA_LOCK:
+        data = load_data()
+        removed = data["telegram_subscribers"].pop(str(chat_id), None)
+        if removed is not None:
+            save_data(data)
+        return removed is not None
 
 
 def get_telegram_subscribers():
@@ -290,25 +398,81 @@ def get_telegram_subscribers():
     return list(data.get("telegram_subscribers", {}).keys())
 
 
-def save_task_answer(task_number, text):
-    data = cleanup_data()
-    task_key = str(task_number)
-    if task_key not in data["tasks"]:
-        return False
+def is_telegram_subscriber(chat_id):
+    return str(chat_id) in get_telegram_subscribers()
 
-    data["tasks"][task_key]["answer_text"] = text
-    save_data(data)
-    return True
+
+def can_manage_bot(chat_id):
+    chat_id_str = str(chat_id)
+    if TELEGRAM_ADMIN_IDS:
+        return chat_id_str in TELEGRAM_ADMIN_IDS
+    return is_telegram_subscriber(chat_id)
+
+
+def format_time_left(finish_ts):
+    left = max(0, int(finish_ts) - int(time.time()))
+    return f"{left // 60}:{left % 60:02d}"
+
+
+def build_help_text():
+    return (
+        "Команды бота:\n"
+        "/start - подписаться на новые файлы\n"
+        "/stop - отключить уведомления\n"
+        "/status - статус бота и таймера\n"
+        "/answer N текст - сохранить ответ к заданию\n"
+        "/reset_time - сбросить таймер на текущее значение\n"
+        "/reset_time 60 - сбросить таймер на 60 минут\n"
+        "/reset_all - удалить все файлы и ответы\n"
+        "/help - показать список команд"
+    )
+
+
+def send_bot_help(chat_id):
+    return send_telegram_message(chat_id, build_help_text())
+
+
+def set_telegram_bot_commands():
+    commands = json.dumps([
+        {"command": "start", "description": "Подписаться на уведомления"},
+        {"command": "stop", "description": "Отключить уведомления"},
+        {"command": "status", "description": "Проверить статус"},
+        {"command": "answer", "description": "Сохранить ответ к заданию"},
+        {"command": "reset_time", "description": "Сбросить таймер"},
+        {"command": "reset_all", "description": "Удалить все файлы"},
+        {"command": "help", "description": "Показать команды"},
+    ], ensure_ascii=False)
+    return telegram_api_call("setMyCommands", {"commands": commands})
+
+
+def maybe_cleanup_subscriber(chat_id):
+    error_text = str(telegram_bot_status.get("last_error", "") or "").lower()
+    if "bot was blocked by the user" in error_text or "user is deactivated" in error_text or "chat not found" in error_text:
+        remove_telegram_subscriber(chat_id)
+        print(f"[telegram] subscriber {chat_id} removed because delivery is no longer possible")
+
+
+def save_task_answer(task_number, text):
+    with DATA_LOCK:
+        data = cleanup_data()
+        task_key = str(task_number)
+        if task_key not in data["tasks"]:
+            return False
+
+        data["tasks"][task_key]["answer_text"] = text
+        save_data(data)
+        return True
 
 
 def remember_telegram_message(chat_id, message_id, task_number):
-    data = load_data()
-    key = f"{chat_id}:{message_id}"
-    data["telegram_message_map"][key] = {
-        "task_number": task_number,
-        "saved_at": datetime.now().strftime("%d.%m.%Y %H:%M:%S")
-    }
-    save_data(data)
+    with DATA_LOCK:
+        data = load_data()
+        key = f"{chat_id}:{message_id}"
+        data["telegram_message_map"][key] = {
+            "task_number": task_number,
+            "saved_at": datetime.now().strftime("%d.%m.%Y %H:%M:%S")
+        }
+        save_data(data)
 
 
 def get_task_number_from_telegram_message(chat_id, message_id):
@@ -354,6 +518,7 @@ def notify_new_file(task_number, filename):
         result = send_telegram_document(chat_id, file_path, task_number)
         if not result or not result.get("ok"):
             print(f"[telegram] failed to send document to {chat_id}: {telegram_bot_status['last_error']}")
+            maybe_cleanup_subscriber(chat_id)
 
 
 def save_answer_from_reply(message):
@@ -397,6 +562,44 @@ def save_answer_from_command(chat_id, text):
     return True
 
 
+def handle_reset_time_command(chat_id, text):
+    if not can_manage_bot(chat_id):
+        send_telegram_message(chat_id, "Эта команда доступна только администратору или подписанному пользователю.")
+        return True
+
+    parts = text.split(maxsplit=1)
+    duration_minutes = None
+    if len(parts) == 2:
+        duration_minutes = normalize_task_number(parts[1])
+        if duration_minutes is None:
+            send_telegram_message(chat_id, "Формат: /reset_time или /reset_time 60")
+            return True
+
+    timer = reset_timer(duration_minutes)
+    send_telegram_message(
+        chat_id,
+        (
+            "Таймер сброшен.\n"
+            f"Новая длительность: {timer['duration_minutes']} мин.\n"
+            f"До конца: {format_time_left(timer['finish_ts'])}"
+        )
+    )
+    return True
+
+
+def handle_reset_all_command(chat_id):
+    if not can_manage_bot(chat_id):
+        send_telegram_message(chat_id, "Эта команда доступна только администратору или подписанному пользователю.")
+        return True
+
+    removed_files = clear_all_tasks()
+    send_telegram_message(
+        chat_id,
+        f"Все файлы и ответы удалены. Удалено файлов: {removed_files}."
+    )
+    return True
+
+
 def handle_telegram_update(update):
     message = update.get("message") or {}
     text = str(message.get("text", "")).strip()
@@ -422,7 +625,8 @@ def handle_telegram_update(update):
         add_telegram_subscriber(chat_id, username=username, full_name=full_name)
         send_telegram_message(
             chat_id,
-            "Подписка включена. Я буду присылать уведомления о новых файлах."
+            "Подписка включена. Я буду присылать новые файлы и принимать ответы.\n\n"
+            + build_help_text()
         )
     elif command == "/stop":
         remove_telegram_subscriber(chat_id)
@@ -431,13 +635,28 @@ def handle_telegram_update(update):
             "Подписка отключена. Уведомления о новых файлах больше не будут приходить."
         )
     elif command == "/status":
-        is_subscribed = str(chat_id) in get_telegram_subscribers()
+        is_subscribed = is_telegram_subscriber(chat_id)
+        timer = get_timer_state()
+        tasks_count = len(cleanup_data()["tasks"])
         send_telegram_message(
             chat_id,
-            "Подписка активна." if is_subscribed else "Подписка не активна. Отправьте /start."
+            (
+                ("Подписка активна.\n" if is_subscribed else "Подписка не активна. Отправьте /start.\n")
+                + f"Файлов: {tasks_count}\n"
+                + f"Таймер: {format_time_left(timer['finish_ts'])}\n"
+                + f"Сброшен: {timer['reset_at']}"
+            )
         )
     elif command == "/answer":
         save_answer_from_command(chat_id, text)
+    elif command == "/reset_time":
+        handle_reset_time_command(chat_id, text)
+    elif command == "/reset_all":
+        handle_reset_all_command(chat_id)
+    elif command == "/help":
+        send_bot_help(chat_id)
+    else:
+        send_bot_help(chat_id)
 
 
 def telegram_polling_loop():
@@ -488,6 +707,9 @@ def start_telegram_bot():
     telegram_api_call("deleteWebhook", {"drop_pending_updates": False})
     if telegram_bot_status["last_error"]:
         print(f"[telegram] webhook cleanup warning: {telegram_bot_status['last_error']}")
+    set_telegram_bot_commands()
+    if telegram_bot_status["last_error"]:
+        print(f"[telegram] commands setup warning: {telegram_bot_status['last_error']}")
 
     telegram_bot_started = True
     print(f"[telegram] bot started: @{telegram_bot_status['bot_username']}")
@@ -497,12 +719,14 @@ def start_telegram_bot():
 
 @app.route("/telegram-status")
 def telegram_status():
+    timer = get_timer_state()
     return jsonify({
         "ok": True,
         "telegram": {
             **telegram_bot_status,
             "subscribers": len(get_telegram_subscribers())
-        }
+        },
+        "timer": timer
     })
 
 
@@ -518,8 +742,16 @@ def index():
         "index.html",
         tasks=sorted(tasks, key=lambda x: x["task_number"]),
         answers_map=answers_map,
-        finish_ts=int(FINISH_TIME.timestamp())
+        finish_ts=int(data["timer"]["finish_ts"])
     )
+
+
+@app.route("/timer-status")
+def timer_status():
+    return jsonify({
+        "ok": True,
+        "timer": get_timer_state()
+    })
 
 
 @app.route("/upload", methods=["POST"])
