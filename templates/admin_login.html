@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Вход в админку</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="admin_login_body">
+    <form class="login_card" method="post" action="{{ url_for('admin_login') }}">
+        <div class="admin_brand_mark login_mark">МК</div>
+        <h1>Админ-панель</h1>
+        <p>Введите пароль для входа.</p>
+        <input type="hidden" name="next" value="{{ next_url }}">
+        <input type="password" name="password" placeholder="Пароль" autocomplete="current-password">
+        <button type="submit">Войти</button>
+        {% if error %}
+            <div class="error">{{ error }}</div>
+        {% endif %}
+    </form>
+</body>
+</html>

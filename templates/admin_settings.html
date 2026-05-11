@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Настройки админки</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="admin_settings_body">
+    <div class="settings_page">
+        <div class="settings_topbar">
+            <div>
+                <h1>Настройки</h1>
+                <div class="muted">Отдельный экран для AI и служебных параметров.</div>
+            </div>
+            <div class="settings_actions">
+                <a href="{{ url_for('admin') }}">К заданиям</a>
+                <form method="post" action="{{ url_for('admin_logout') }}">
+                    <button type="submit" class="ghost">Выйти</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="settings_flash" id="flash"></div>
+
+        <div class="settings_grid">
+            <section class="settings_card">
+                <h2>AI доступ по никам</h2>
+                <div class="settings_row">
+                    <input type="text" id="aiNicknameInput" placeholder="Введите никнейм">
+                    <button type="button" id="addAiBtn">Добавить</button>
+                </div>
+                <div class="chips" id="aiList">
+                    {% for nickname in ai_allowed_nicknames %}
+                        <div class="chip" data-nickname="{{ nickname }}">
+                            <span>{{ nickname }}</span>
+                            <button type="button" data-remove="{{ nickname }}">Удалить</button>
+                        </div>
+                    {% else %}
+                        <div class="muted" id="emptyHint">Список пока пуст.</div>
+                    {% endfor %}
+                </div>
+            </section>
+
+            <section class="settings_card">
+                <h2>AI настройки</h2>
+                <div class="settings-form">
+                    <label class="switch-row">
+                        <span>AI включен</span>
+                        <input type="checkbox" id="aiEnabledInput" {% if config_view.AI_ENABLED %}checked{% endif %}>
+                    </label>
+                    <div class="field">
+                        <label for="aiModelInput">Модель</label>
+                        <input type="text" id="aiModelInput" value="{{ config_view.OPENAI_MODEL }}" list="modelOptions" placeholder="Например, gpt-5.4-mini">
+                        <datalist id="modelOptions">
+                            <option value="gpt-5.4-mini"></option>
+                            <option value="gpt-5.4"></option>
+                            <option value="gpt-5.3-codex"></option>
+                            <option value="gpt-5.2"></option>
+                        </datalist>
+                    </div>
+                    <div class="field">
+                        <label for="aiPromptInput">Промпт для AI</label>
+                        <textarea id="aiPromptInput" class="settings_textarea" placeholder="Инструкция, с которой AI будет решать задания">{{ config_view.AI_PROMPT }}</textarea>
+                    </div>
+                    <button type="button" id="saveAiSettingsBtn">Сохранить AI настройки</button>
+                </div>
+                <div class="kv settings_kv">
+                    <div class="kv-row"><span>OpenAI ключ задан</span><strong>{{ 'Да' if config_view.OPENAI_API_KEY_SET else 'Нет' }}</strong></div>
+                    <div class="kv-row"><span>Пароль админки задан</span><strong>{{ 'Да' if config_view.ADMIN_PASSWORD_SET else 'Нет' }}</strong></div>
+                    <div class="kv-row"><span>API URL</span><strong>{{ config_view.OPENAI_API_URL }}</strong></div>
+                    <div class="kv-row"><span>Источник API ключа</span><strong>config.py / env</strong></div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <script>
+        const aiList = document.getElementById("aiList");
+        const aiNicknameInput = document.getElementById("aiNicknameInput");
+        const addAiBtn = document.getElementById("addAiBtn");
+        const aiEnabledInput = document.getElementById("aiEnabledInput");
+        const aiModelInput = document.getElementById("aiModelInput");
+        const aiPromptInput = document.getElementById("aiPromptInput");
+        const saveAiSettingsBtn = document.getElementById("saveAiSettingsBtn");
+        const flash = document.getElementById("flash");
+
+        function showFlash(message, isError = false) {
+            flash.textContent = message;
+            flash.className = `settings_flash${isError ? " error" : ""}`;
+            flash.style.display = "block";
+        }
+
+        function rebuildNicknames(nicknames) {
+            aiList.innerHTML = "";
+            if (!nicknames.length) {
+                aiList.innerHTML = '<div class="muted" id="emptyHint">Список пока пуст.</div>';
+                return;
+            }
+            nicknames.forEach((nickname) => {
+                const chip = document.createElement("div");
+                chip.className = "chip";
+                chip.dataset.nickname = nickname;
+                chip.innerHTML = `<span>${nickname}</span><button type="button" data-remove="${nickname}">Удалить</button>`;
+                aiList.appendChild(chip);
+            });
+        }
+
+        addAiBtn.addEventListener("click", async () => {
+            const nickname = aiNicknameInput.value.trim();
+            if (!nickname) return;
+            const response = await fetch("/api/ai-allowed", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ nickname })
+            });
+            const data = await response.json();
+            if (!response.ok || !data.ok) {
+                showFlash(data.error || "Не удалось добавить ник", true);
+                return;
+            }
+            aiNicknameInput.value = "";
+            rebuildNicknames(data.nicknames || []);
+            showFlash("Ник добавлен.");
+        });
+
+        aiList.addEventListener("click", async (event) => {
+            const button = event.target.closest("button[data-remove]");
+            if (!button) return;
+            const nickname = button.dataset.remove;
+            const response = await fetch(`/api/ai-allowed/${encodeURIComponent(nickname)}`, {
+                method: "DELETE"
+            });
+            const data = await response.json();
+            if (!response.ok || !data.ok) {
+                showFlash(data.error || "Не удалось удалить ник", true);
+                return;
+            }
+            rebuildNicknames(data.nicknames || []);
+            showFlash("Ник удален.");
+        });
+
+        saveAiSettingsBtn.addEventListener("click", async () => {
+            const model = aiModelInput.value.trim();
+            const prompt = aiPromptInput.value.trim();
+            if (!model) {
+                showFlash("Укажите модель.", true);
+                return;
+            }
+            if (!prompt) {
+                showFlash("Укажите промпт для AI.", true);
+                return;
+            }
+            const response = await fetch("/api/admin/settings/ai", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    enabled: aiEnabledInput.checked,
+                    model,
+                    prompt
+                })
+            });
+            const data = await response.json();
+            if (!response.ok || !data.ok) {
+                showFlash(data.error || "Не удалось сохранить AI настройки", true);
+                return;
+            }
+            showFlash("AI настройки сохранены.");
+        });
+    </script>
+</body>
+</html>

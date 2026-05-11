@@ -1,0 +1,43 @@
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATA_DIR: /data
+      AI_MAX_WORKERS: ${AI_MAX_WORKERS:-15}
+      SQLITE_TIMEOUT_SECONDS: ${SQLITE_TIMEOUT_SECONDS:-60}
+      SQLITE_CACHE_KB: ${SQLITE_CACHE_KB:-32768}
+    volumes:
+      - mcko_data:/data
+    networks:
+      - internal
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - internal
+
+volumes:
+  mcko_data:
+    name: mcko_data
+  caddy_data:
+    name: mcko_caddy_data
+  caddy_config:
+    name: mcko_caddy_config
+
+networks:
+  internal:
+    driver: bridge

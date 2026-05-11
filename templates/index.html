@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="ru" translate="no" class="notranslate">
+<head>
+    <meta charset="UTF-8">
+    <title>Компьютерное тестирование</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="{{ url_for('static', filename='main7.css') }}" rel="stylesheet" type="text/css">
+    <link href="{{ url_for('static', filename='virt_kb.css') }}" rel="stylesheet" type="text/css">
+    <link href="{{ url_for('static', filename='mpu.css') }}" rel="stylesheet" type="text/css">
+    <link href="{{ url_for('static', filename='kim.css') }}" rel="stylesheet" type="text/css">
+    <link href="{{ url_for('static', filename='jquery-ui.css') }}" rel="stylesheet" type="text/css">
+    <script src="{{ url_for('static', filename='jquery.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='jquery-ui.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='jquery.ui.touch-punch.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='virt_kb.js') }}"></script>
+    <style>
+        body {
+            background: #ffffff url("{{ url_for('static', filename='bg.png') }}") repeat fixed 0 0;
+            background-size: 560px auto;
+        }
+        .flash-wrap { margin: 16px 15px 0; width: 1020px; }
+        .flash { padding: 12px 16px; border-radius: 10px; margin-bottom: 10px; border: 1px solid #d6d6d6; }
+        .flash.success { background: #edf8e6; border-color: #b9d7a9; }
+        .flash.error { background: #fff1f1; border-color: #ebb0b0; }
+        .qnum.answered,
+        .qnum.yellow { background: #ffff88; border-color: #333399; }
+        .qnum.answered:hover,
+        .qnum.yellow:hover { background: #f0f044; }
+        .task-buttons {
+            padding-left: 8px;
+            clear: both;
+            position: relative;
+            z-index: 5;
+        }
+        .task-buttons .qnum {
+            float: left;
+            display: block;
+            min-height: 32px;
+            line-height: 1.1;
+            position: relative;
+            z-index: 6;
+            pointer-events: auto;
+        }
+        .upload-launch { margin-top: 18px; }
+        .answer_flex.answer-row {
+            align-items: center;
+            gap: 6px;
+        }
+        .answer-row p { margin: 0; }
+        .answer-textbox {
+            width: 98px;
+            height: 38px;
+            border: 1px solid #ccc;
+            border-radius: 0;
+            padding: 2px;
+            background: #fff;
+            font-size: 12pt;
+            line-height: 1.2;
+            text-align: left;
+            box-sizing: border-box;
+        }
+        .compact-panel {
+            position: fixed;
+            left: 10px;
+            top: 98px;
+            width: min(420px, calc(100vw - 20px));
+            max-height: min(430px, calc(100vh - 120px));
+            overflow: auto;
+            background: rgba(255, 255, 255, 0.96);
+            border: 1px solid #cdd7e5;
+            box-shadow: 0 10px 24px rgba(51, 65, 85, 0.12);
+            padding: 8px;
+            z-index: 1001;
+            display: none;
+        }
+        .compact-panel.open { display: block; }
+        .compact-panel-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+        .compact-panel-title { font-size: 13px; font-weight: bold; color: #334155; }
+        .compact-panel-close {
+            width: 24px;
+            height: 24px;
+            padding: 0;
+            font-size: 13px;
+        }
+        .compact-item {
+            border-top: 1px solid #edf2f7;
+            padding: 6px 0;
+            font-size: 12px;
+            line-height: 1.3;
+            color: #334155;
+        }
+        .compact-item:first-child { border-top: 0; }
+        .compact-item strong { font-size: 12px; color: #111827; }
+        .compact-muted { font-size: 12px; color: #7b8794; }
+        .compact-files { margin-top: 3px; color: #475569; }
+        .compact-text {
+            margin-top: 3px;
+            max-height: 42px;
+            overflow: hidden;
+            white-space: pre-wrap;
+        }
+        .upload-panel {
+            position: fixed;
+            left: 10px;
+            bottom: 10px;
+            width: min(235px, calc(100vw - 18px));
+            background: rgba(252, 253, 255, 0.88);
+            border: 1px solid #dbe3ef;
+            border-radius: 10px;
+            box-shadow: 0 8px 22px rgba(70, 92, 125, 0.10);
+            padding: 8px;
+            display: none;
+            z-index: 1000;
+        }
+        .upload-panel.open { display: block; }
+        .upload-grid { display: grid; gap: 6px; }
+        .upload-row { display: grid; gap: 4px; }
+        .upload-row label { font-size: 11px; color: #6c7b92; }
+        .upload-panel select,
+        .upload-panel textarea,
+        .upload-panel input[type="file"] {
+            width: 100%;
+            box-sizing: border-box;
+            border: 1px solid #d6dfeb;
+            border-radius: 7px;
+            padding: 5px 7px;
+            background: rgba(249, 251, 255, 0.92);
+            font-size: 12px;
+        }
+        .upload-panel textarea { min-height: 50px; resize: vertical; }
+        .file-list { font-size: 11px; color: #64748b; line-height: 1.25; }
+        .panel-actions { display: flex; justify-content: space-between; gap: 6px; align-items: center; }
+        .panel-actions button {
+            margin-top: 0;
+            font-size: 12px;
+            padding: 4px 8px;
+            background: #f6f8fc;
+            color: #4c5b72;
+            border: 1px solid #cdd7e5;
+        }
+        .panel-actions button[disabled] { opacity: 0.55; cursor: not-allowed; }
+        .toast {
+            position: fixed;
+            left: 50%;
+            bottom: 20px;
+            transform: translateX(-50%);
+            background: rgba(39, 57, 80, 0.92);
+            color: #fff;
+            padding: 9px 14px;
+            border-radius: 999px;
+            font-size: 13px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+            z-index: 1200;
+        }
+        .toast.visible { opacity: 1; }
+        .corner-auth {
+            position: fixed;
+            right: 12px;
+            bottom: 12px;
+            width: 210px;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.94);
+            border: 1px solid #d8dfeb;
+            border-radius: 10px;
+            box-shadow: 0 10px 28px rgba(56, 75, 104, 0.10);
+            opacity: 0;
+            transform: translateY(8px);
+            pointer-events: none;
+            transition: opacity 0.16s ease, transform 0.16s ease;
+            z-index: 1100;
+        }
+        .corner-auth.visible {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+        .corner-auth-title { font-size: 12px; color: #6b7a8d; margin-bottom: 5px; }
+        .corner-auth-uid { font-size: 11px; color: #8a97a8; margin-bottom: 6px; }
+        .corner-auth input {
+            width: 100%;
+            border: 1px solid #d6dfeb;
+            border-radius: 7px;
+            padding: 6px 8px;
+            font-size: 12px;
+            background: #fbfcfe;
+            margin-bottom: 6px;
+            box-sizing: border-box;
+        }
+        .corner-auth-row { display: flex; gap: 6px; }
+        .corner-auth-row button {
+            flex: 1;
+            margin-top: 0;
+            font-size: 12px;
+            padding: 5px 8px;
+            background: #f5f8fd;
+            color: #49586d;
+            border: 1px solid #cfd8e5;
+        }
+        .corner-auth-status { font-size: 11px; color: #64748b; margin-top: 5px; min-height: 14px; }
+        body.file-dragover::after {
+            content: "Отпустите файл для загрузки";
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(73, 107, 155, 0.16);
+            border: 4px dashed #4f74a0;
+            color: #1f3d63;
+            font-size: 28px;
+            z-index: 999;
+            pointer-events: none;
+        }
+        @media (max-width: 820px) {
+            body { min-width: 0; }
+            #content, #QuestionTest, .flash-wrap { width: auto; }
+            #content { padding-right: 10px; }
+            .corner-auth { width: min(220px, calc(100vw - 20px)); }
+        }
+    </style>
+</head>
+<body>
+<div style="clear:both"></div>
+<div id="header">
+    <div class="subheader2x">
+        <table border="0" cellpadding="0" cellspacing="0" width="100%">
+            <tr>
+                <td>
+                    <p style="margin-left:15px;color:#000000;font-size:12pt;text-indent:0">Задания:</p>
+                </td>
+                <td><p id="topline"><font>Оставшееся время - 45:00</font></p></td>
+            </tr>
+        </table>
+        <div class="task-buttons">
+            <button class="qnum" type="button" id="descriptionBtn">Описание</button>
+            {% for task in task_numbers %}
+                <button class="qnum {% if task == '6.1' %}qramka{% endif %} {% if task in answered_tasks %}answered yellow{% endif %}" type="button" data-task="{{ task }}">{{ task }}</button>
+            {% endfor %}
+            <button class="qnum" type="button" id="finishBtn">закончить</button>
+        </div>
+    </div>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        <div class="flash-wrap">
+            {% for category, message in messages %}
+                <div class="flash {{ category }}">{{ message }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+{% endwith %}
+
+<div id="content">
+    <div id="QuestionTest">
+        <img src="{{ url_for('static', filename='image001.png') }}" width="300" style="float:right; margin-left:20px;">
+        <p class="MsoNormal">
+            На горизонтальной поверхности стола лежит брусок массой <i style="font-family:'Times New Roman', serif; font-size:18pt">m</i> = 2,0 кг
+            (см. рисунок). К бруску приложена горизонтальная сила
+            <span style="position:relative;top:-4.0pt"><img src="{{ url_for('static', filename='demo_6.1(1).png') }}"></span>
+            под действием которой брусок движется по поверхности стола с ускорением
+            <i style="font-family:'Times New Roman', serif; font-size:18pt">а</i> = 2 м/с<sup>2</sup>.
+            Коэффициент трения между бруском и поверхностью стола
+            <span style="font-family:'Times New Roman', serif; font-size:18pt">μ</span> = 0,4.
+            Ускорение свободного падения <i style="font-family:'Times New Roman', serif; font-size:18pt">g</i> = 10 м/с<sup>2</sup>.
+        </p>
+
+        <p class="qq"><b>А.</b> Из предложенного списка выберите формулу, по которой можно рассчитать модуль силы трения скольжения, действующей на брусок.</p>
+        <table>
+            <tr>
+                <td><label for="r1"><div class="answer"><input type="radio" class="ans" id="r1" name="a0" value="1">&nbsp;<i style="font-family:'Times New Roman', serif; font-size:18pt">mg</i></div></label></td>
+                <td><label for="r2"><div class="answer"><input type="radio" class="ans" id="r2" name="a0" value="2">&nbsp;<span style="font-family:'Times New Roman', serif; font-size:18pt">μ</span><i style="font-family:'Times New Roman', serif; font-size:18pt">mg</i></div></label></td>
+                <td><label for="r3"><div class="answer"><input type="radio" class="ans" id="r3" name="a0" value="3">&nbsp;<i style="font-family:'Times New Roman', serif; font-size:18pt">ma</i></div></label></td>
+                <td><label for="r4"><div class="answer"><input type="radio" class="ans" id="r4" name="a0" value="4">&nbsp;<span style="font-family:'Times New Roman', serif; font-size:18pt">μ</span><i style="font-family:'Times New Roman', serif; font-size:18pt">ma</i></div></label></td>
+            </tr>
+        </table>
+        <br>
+        <p class="qq"><b>Б.</b> Определите модуль силы трения скольжения, действующей на брусок.</p>
+        <div class="answer_flex answer-row" id="answerFrame">
+            <p class="MsoNormal">Ответ:</p>
+            <input id="a1" class="answer-textbox" type="text" placeholder="">
+            <span>Н.</span>
+        </div>
+
+        <div class="upload-launch" id="AnswerHere">
+            <button type="button" id="openUploadPanel">Сохранить ответ</button>
+        </div>
+    </div>
+</div>
+
+<div class="upload-panel" id="uploadPanel">
+    <form method="post" action="{{ url_for('submit') }}" enctype="multipart/form-data" id="uploadForm" autocomplete="off">
+        <div class="upload-grid">
+            <div class="upload-row">
+                <label for="taskNumber">Задание</label>
+                <select name="task_number" id="taskNumber">
+                    <option value="" selected>Авто</option>
+                    {% for task in task_numbers %}
+                        <option value="{{ task }}">{{ task }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="upload-row">
+                <label for="fileInput">Файл</label>
+                <input type="file" id="fileInput" name="files" multiple>
+            </div>
+
+            <div class="upload-row">
+                <div class="file-list" id="fileList">Файлы не выбраны</div>
+            </div>
+
+            <div class="upload-row">
+                <label for="textContent">Текст</label>
+                <textarea name="text_content" id="textContent" placeholder=""></textarea>
+            </div>
+
+            <div class="panel-actions">
+                <button type="button" id="closeUploadPanel">x</button>
+                <button type="submit" id="submitButton" disabled>ok</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<div class="corner-auth" id="cornerAuth">
+    <div class="corner-auth-title">Вход по нику</div>
+    <div class="corner-auth-uid" id="uidLabel">ID: {{ current_user.uid }}</div>
+    <input type="text" id="nicknameInput" value="{{ current_user.nickname }}" placeholder="Введите ник">
+    <div class="corner-auth-row">
+        <button type="button" id="saveNicknameBtn">Сохранить</button>
+        <button type="button" id="closeNicknameBtn">Скрыть</button>
+    </div>
+    <div class="corner-auth-status" id="nicknameStatus"></div>
+</div>
+
+<div class="toast" id="toast">Ответ отправлен</div>
+
+<div class="compact-panel" id="compactPanel">
+    <div class="compact-panel-head">
+        <div class="compact-panel-title" id="compactPanelTitle"></div>
+        <button type="button" class="compact-panel-close" id="closeCompactPanel">x</button>
+    </div>
+    <div id="compactPanelBody"></div>
+</div>
+
+<script>
+    const taskNumbers = {{ task_numbers_json|safe }};
+    let teacherAnswers = {{ teacher_answers|tojson }};
+    let answeredTasks = new Set({{ answered_tasks|list|tojson }});
+    const currentUser = {{ current_user|tojson }};
+
+    const uploadPanel = document.getElementById("uploadPanel");
+    const openUploadPanel = document.getElementById("openUploadPanel");
+    const closeUploadPanel = document.getElementById("closeUploadPanel");
+    const fileInput = document.getElementById("fileInput");
+    const textContent = document.getElementById("textContent");
+    const taskNumberSelect = document.getElementById("taskNumber");
+    const submitButton = document.getElementById("submitButton");
+    const fileList = document.getElementById("fileList");
+    const uploadForm = document.getElementById("uploadForm");
+    const answerField = document.getElementById("a1");
+    const answerFrame = document.getElementById("answerFrame");
+    const toast = document.getElementById("toast");
+    const descriptionBtn = document.getElementById("descriptionBtn");
+    const finishBtn = document.getElementById("finishBtn");
+    const compactPanel = document.getElementById("compactPanel");
+    const compactPanelTitle = document.getElementById("compactPanelTitle");
+    const compactPanelBody = document.getElementById("compactPanelBody");
+    const closeCompactPanel = document.getElementById("closeCompactPanel");
+    const cornerAuth = document.getElementById("cornerAuth");
+    const nicknameInput = document.getElementById("nicknameInput");
+    const saveNicknameBtn = document.getElementById("saveNicknameBtn");
+    const closeNicknameBtn = document.getElementById("closeNicknameBtn");
+    const nicknameStatus = document.getElementById("nicknameStatus");
+    const uidLabel = document.getElementById("uidLabel");
+    const dataTransfer = new DataTransfer();
+    const ANSWERS_REFRESH_NORMAL_MS = 5000;
+    const ANSWERS_REFRESH_FAST_MS = 5000;
+    const ANSWERS_FAST_WINDOW_MS = 120000;
+    let dragDepth = 0;
+    let authPinned = false;
+    let lastAnswersRefreshAt = 0;
+    let fastAnswersUntil = 0;
+    let answersSnapshot = JSON.stringify({
+        teacherAnswers,
+        answeredTasks: [...answeredTasks].sort(),
+        uid: currentUser.uid,
+        nickname: currentUser.nickname || ""
+    });
+
+    function showToast(message) {
+        toast.textContent = message;
+        toast.classList.add("visible");
+        window.clearTimeout(showToast.timer);
+        showToast.timer = window.setTimeout(() => {
+            toast.classList.remove("visible");
+        }, 1800);
+    }
+
+    function escapeHtml(value) {
+        return String(value || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    async function fetchSummary() {
+        const response = await fetch("/my-summary");
+        const data = await response.json();
+        if (!response.ok || !data.ok) {
+            throw new Error(data.error || "Не удалось загрузить список");
+        }
+        return data;
+    }
+
+    function openCompactPanel(title, content) {
+        compactPanelTitle.textContent = title;
+        compactPanelBody.innerHTML = content;
+        compactPanel.classList.add("open");
+    }
+
+    function closeExtraWindows() {
+        uploadPanel.classList.remove("open");
+        compactPanel.classList.remove("open");
+        cornerAuth.classList.remove("visible");
+        authPinned = false;
+    }
+
+    function renderUploadsList(uploads) {
+        if (!uploads.length) {
+            return '<div class="compact-muted">Загрузок пока нет.</div>';
+        }
+        return uploads.map((item) => {
+            const files = (item.files || []).map((file) => escapeHtml(file.original_name)).join(", ");
+            const text = String(item.text_content || "").trim();
+            return `
+                <div class="compact-item">
+                    <strong>№${escapeHtml(item.task_number)}</strong>
+                    <span class="compact-muted">${escapeHtml(item.created || "")}</span>
+                    ${files ? `<div class="compact-files">Файлы: ${files}</div>` : ""}
+                    ${text ? `<div class="compact-text">${escapeHtml(text)}</div>` : '<div class="compact-muted">Текст не добавлен.</div>'}
+                </div>
+            `;
+        }).join("");
+    }
+
+    function renderAnswersList(taskNumbersList, answers) {
+        return taskNumbersList.map((task) => {
+            const answer = String((answers || {})[task] || "").trim();
+            return `
+                <div class="compact-item">
+                    <strong>№${escapeHtml(task)}</strong>
+                    ${answer ? `<span>${escapeHtml(answer)}</span>` : '<span class="compact-muted">нет ответа</span>'}
+                </div>
+            `;
+        }).join("");
+    }
+
+    function renderFiles() {
+        const names = Array.from(fileInput.files).map((file, index) => `${index + 1}. ${file.name}`);
+        fileList.textContent = names.length ? names.join(" | ") : "Файлы не выбраны";
+        validateForm();
+    }
+
+    function syncFiles(files) {
+        for (const file of files) {
+            dataTransfer.items.add(file);
+        }
+        fileInput.files = dataTransfer.files;
+        renderFiles();
+    }
+
+    function validateForm() {
+        const hasText = textContent.value.trim().length > 0;
+        const hasFiles = fileInput.files.length > 0;
+        submitButton.disabled = !(hasText || hasFiles);
+    }
+
+    function resetUploadForm() {
+        uploadForm.reset();
+        dataTransfer.items.clear();
+        fileInput.files = dataTransfer.files;
+        renderFiles();
+    }
+
+    function refreshTaskButtons() {
+        document.querySelectorAll(".qnum[data-task]").forEach((button) => {
+            const task = button.dataset.task;
+            button.classList.toggle("answered", answeredTasks.has(task));
+        });
+    }
+
+    function startCountdownTimer() {
+        const timerElement = document.getElementById("topline");
+        const startSeconds = 45 * 60;
+        const durationMs = startSeconds * 1000;
+        const storageKey = "mckoCountdownFinishAt";
+        let finishAt = Number(window.localStorage.getItem(storageKey));
+
+        if (!Number.isFinite(finishAt) || finishAt <= Date.now()) {
+            finishAt = Date.now() + durationMs;
+            window.localStorage.setItem(storageKey, String(finishAt));
+        }
+
+        function renderTimer() {
+            const now = Date.now();
+            if (now > finishAt) {
+                const missedCycles = Math.floor((now - finishAt) / durationMs) + 1;
+                finishAt += missedCycles * durationMs;
+                window.localStorage.setItem(storageKey, String(finishAt));
+            }
+            const remainingSeconds = Math.ceil((finishAt - now) / 1000);
+            const minutes = String(Math.floor(remainingSeconds / 60)).padStart(2, "0");
+            const seconds = String(remainingSeconds % 60).padStart(2, "0");
+            const color = remainingSeconds < 5 * 60 ? "#aa0000" : "";
+            timerElement.innerHTML = `<font${color ? ` color="${color}"` : ""}>Оставшееся время - ${minutes}:${seconds}</font>`;
+        }
+
+        renderTimer();
+        window.setInterval(renderTimer, 1000);
+    }
+
+    function updateTopline(user) {
+        uidLabel.textContent = `ID: ${user.uid}`;
+    }
+
+    async function saveCurrentTask(taskNumber) {
+        try {
+            await fetch("/profile/current-task", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ task_number: taskNumber || "" })
+            });
+        } catch (error) {
+            console.error(error);
+        }
+    }
+
+    async function refreshAnswers(options = {}) {
+        try {
+            if (document.visibilityState !== "visible") {
+                return;
+            }
+            const now = Date.now();
+            const minInterval = now < fastAnswersUntil ? ANSWERS_REFRESH_FAST_MS : ANSWERS_REFRESH_NORMAL_MS;
+            if (!options.force && now - lastAnswersRefreshAt < minInterval) {
+                return;
+            }
+            lastAnswersRefreshAt = now;
+            const response = await fetch("/answers");
+            const data = await response.json();
+            if (!data.ok) {
+                return;
+            }
+            const nextSnapshot = JSON.stringify({
+                teacherAnswers: data.teacher_answers || {},
+                answeredTasks: [...(data.answered_tasks || [])].sort(),
+                uid: data.user.uid,
+                nickname: data.user.nickname || ""
+            });
+            if (nextSnapshot === answersSnapshot) {
+                return;
+            }
+            answersSnapshot = nextSnapshot;
+            teacherAnswers = data.teacher_answers || {};
+            answeredTasks = new Set(data.answered_tasks || []);
+            updateTopline(data.user);
+            if (document.activeElement !== nicknameInput) {
+                nicknameInput.value = data.user.nickname || "";
+            }
+            refreshTaskButtons();
+            const activeTaskButton = document.querySelector(".qnum[data-task].selected-task");
+            if (activeTaskButton) {
+                const task = activeTaskButton.dataset.task;
+                answerField.value = teacherAnswers[task] || "";
+            }
+        } catch (error) {
+            console.error(error);
+        }
+    }
+
+    async function saveNickname() {
+        nicknameStatus.textContent = "Сохранение...";
+        try {
+            const response = await fetch("/profile", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ nickname: nicknameInput.value })
+            });
+            const data = await response.json();
+            if (!data.ok) {
+                throw new Error("Не удалось сохранить ник");
+            }
+            nicknameStatus.textContent = data.user.nickname ? "Ник сохранен" : "Ник очищен";
+            updateTopline(data.user);
+            answersSnapshot = JSON.stringify({
+                teacherAnswers,
+                answeredTasks: [...answeredTasks].sort(),
+                uid: data.user.uid,
+                nickname: data.user.nickname || ""
+            });
+            if (data.ai_queued) {
+                fastAnswersUntil = Date.now() + ANSWERS_FAST_WINDOW_MS;
+                refreshAnswers({ force: true });
+            }
+            showToast("Ник сохранен");
+        } catch (error) {
+            nicknameStatus.textContent = error.message;
+        }
+    }
+
+    openUploadPanel.addEventListener("click", () => {
+        taskNumberSelect.value = "";
+        uploadPanel.classList.add("open");
+        textContent.focus();
+    });
+
+    closeUploadPanel.addEventListener("click", () => {
+        uploadPanel.classList.remove("open");
+    });
+
+    fileInput.addEventListener("change", () => {
+        dataTransfer.items.clear();
+        for (const file of fileInput.files) {
+            dataTransfer.items.add(file);
+        }
+        fileInput.files = dataTransfer.files;
+        renderFiles();
+    });
+
+    textContent.addEventListener("input", validateForm);
+    taskNumberSelect.addEventListener("change", () => {
+        saveCurrentTask(taskNumberSelect.value);
+    });
+    descriptionBtn.addEventListener("click", async () => {
+        try {
+            const data = await fetchSummary();
+            openCompactPanel("Загруженные ответы", renderUploadsList(data.uploads || []));
+        } catch (error) {
+            showToast(error.message || "Ошибка");
+        }
+    });
+    finishBtn.addEventListener("click", async () => {
+        try {
+            const data = await fetchSummary();
+            openCompactPanel("Ответы на задания", renderAnswersList(data.task_numbers || taskNumbers, data.answers || {}));
+        } catch (error) {
+            showToast(error.message || "Ошибка");
+        }
+    });
+    closeCompactPanel.addEventListener("click", () => {
+        compactPanel.classList.remove("open");
+    });
+    answerFrame.addEventListener("pointerdown", closeExtraWindows);
+
+    document.querySelectorAll(".qnum[data-task]").forEach((button) => {
+        button.addEventListener("click", () => {
+            document.querySelectorAll(".qnum[data-task]").forEach((item) => item.classList.remove("selected-task"));
+            button.classList.add("selected-task");
+            const task = button.dataset.task;
+            answerField.value = teacherAnswers[task] || "";
+            saveCurrentTask(task);
+        });
+    });
+
+    ["dragenter", "dragover"].forEach((eventName) => {
+        document.addEventListener(eventName, (event) => {
+            if (!uploadPanel.classList.contains("open")) {
+                return;
+            }
+            event.preventDefault();
+            dragDepth += 1;
+            document.body.classList.add("file-dragover");
+        });
+    });
+
+    document.addEventListener("dragleave", (event) => {
+        if (!uploadPanel.classList.contains("open")) {
+            return;
+        }
+        event.preventDefault();
+        dragDepth = Math.max(dragDepth - 1, 0);
+        if (dragDepth === 0) {
+            document.body.classList.remove("file-dragover");
+        }
+    });
+
+    document.addEventListener("drop", (event) => {
+        if (!uploadPanel.classList.contains("open")) {
+            return;
+        }
+        event.preventDefault();
+        dragDepth = 0;
+        document.body.classList.remove("file-dragover");
+        if (event.dataTransfer.files.length) {
+            syncFiles(event.dataTransfer.files);
+        }
+    });
+
+    document.addEventListener("paste", (event) => {
+        if (!uploadPanel.classList.contains("open")) {
+            return;
+        }
+        const pastedFiles = Array.from(event.clipboardData.files || []);
+        if (pastedFiles.length) {
+            syncFiles(pastedFiles);
+        }
+    });
+
+    uploadForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        submitButton.disabled = true;
+        try {
+            const formData = new FormData(uploadForm);
+            const response = await fetch("/submit", {
+                method: "POST",
+                body: formData,
+                headers: { "X-Requested-With": "fetch" }
+            });
+            const data = await response.json();
+            if (!response.ok || !data.ok) {
+                throw new Error(data.error || "Не удалось отправить ответ");
+            }
+            resetUploadForm();
+            uploadPanel.classList.remove("open");
+            showToast(data.message || "Ответ отправлен");
+            fastAnswersUntil = Date.now() + ANSWERS_FAST_WINDOW_MS;
+            await refreshAnswers({ force: true });
+        } catch (error) {
+            showToast(error.message || "Ошибка");
+        } finally {
+            validateForm();
+        }
+    });
+
+    document.addEventListener("mousemove", (event) => {
+        if (authPinned) {
+            cornerAuth.classList.add("visible");
+            return;
+        }
+        const nearCorner = event.clientX > window.innerWidth - 160 && event.clientY > window.innerHeight - 140;
+        cornerAuth.classList.toggle("visible", nearCorner);
+    });
+
+    cornerAuth.addEventListener("mouseenter", () => {
+        authPinned = true;
+        cornerAuth.classList.add("visible");
+    });
+    cornerAuth.addEventListener("mouseleave", () => {
+        authPinned = false;
+        cornerAuth.classList.remove("visible");
+    });
+
+    saveNicknameBtn.addEventListener("click", saveNickname);
+    closeNicknameBtn.addEventListener("click", () => {
+        authPinned = false;
+        cornerAuth.classList.remove("visible");
+    });
+    nicknameInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+            event.preventDefault();
+            saveNickname();
+        }
+    });
+
+    renderFiles();
+    taskNumberSelect.value = "";
+    refreshTaskButtons();
+    startCountdownTimer();
+    document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") {
+            refreshAnswers();
+        }
+    });
+    window.setInterval(refreshAnswers, ANSWERS_REFRESH_FAST_MS);
+</script>
+</body>
+</html>

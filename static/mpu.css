@@ -1,0 +1,63 @@
+/*
+Used for MPU tests - with bright colourful table background
+2026-03-21 - input font Tahoma issue fidex by adding sans-serif (for Linux-systems)
+*/
+
+.tbl {
+	border:1px solid #999999;
+	empty-cells:show;
+	border-collapse:collapse;
+	font-size:20px;
+	margin-top:10px;
+}
+
+.tbl th {
+	border:1px solid #999999;
+	padding:9px;
+	text-align:center;
+/*	background:radial-gradient(farthest-corner at 50% 50%, white, #eeCCC8);*/
+	background:radial-gradient(farthest-corner at 10% 20%, white, #bCcCe8);
+	font-size:20px;
+	font-weight:bold;
+}
+
+.tbl td {
+	border:1px solid #999999;
+	padding:9px;
+	font-size:20px;
+	background:radial-gradient(farthest-corner at 10% 20%, white, #DCECF8);
+}
+
+p { text-align:justify; text-indent:47px; font-size:20px; }
+
+/* Контекст задания */
+p.zad { text-align:justify; text-indent:47px; color:#440000; margin-top:15px; }
+div.zad { color:#440000; margin-top:15px; }
+
+/* Инструктивные указания == вопрос == например, "Выберите три значения" */
+p.qq {
+font-size:20px;
+color:#880000;
+border-left:4px solid #880000;
+/*
+border-right:1px dotted #aaaaaa;
+border-top:1px dotted #aaaaaa;
+border-bottom:1px dotted #aaaaaa;
+background-color:#fafafa;
+*/
+text-align:justify; text-indent:0px; padding-left:10px; margin-top:10px;margin-bottom:10px;
+}
+
+nobr, b, i, u, span, center { font-size:inherit; }
+
+.layer { clear:both; overflow: scroll;  resize: vertical; padding-left:10px; padding-right:10px}
+
+sub { font-size:15px; }
+sup { font-size:15px; }
+
+input {
+ font-family: Tahoma,sans-serif;
+ font-size:21px;
+}
+
+p.MsoNormal, li.MsoNormal, div.MsoNormal { font-size:20px; text-indent:0px; }
