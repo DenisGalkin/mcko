@@ -8,10 +8,7 @@
     <link href="{{ url_for('static', filename='virt_kb.css') }}" rel="stylesheet" type="text/css">
     <link href="{{ url_for('static', filename='mpu.css') }}" rel="stylesheet" type="text/css">
     <link href="{{ url_for('static', filename='kim.css') }}" rel="stylesheet" type="text/css">
-    <link href="{{ url_for('static', filename='jquery-ui.css') }}" rel="stylesheet" type="text/css">
     <script src="{{ url_for('static', filename='jquery.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='jquery-ui.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='jquery.ui.touch-punch.min.js') }}"></script>
     <script src="{{ url_for('static', filename='virt_kb.js') }}"></script>
     <style>
         body {
@@ -150,10 +147,12 @@
             left: 50%;
             bottom: 20px;
             transform: translateX(-50%);
-            background: rgba(39, 57, 80, 0.92);
-            color: #fff;
+            background: rgba(255, 255, 255, 0.96);
+            color: #334155;
             padding: 9px 14px;
             border-radius: 999px;
+            border: 1px solid #d7e0ec;
+            box-shadow: 0 8px 24px rgba(72, 92, 124, 0.14);
             font-size: 13px;
             opacity: 0;
             pointer-events: none;
@@ -161,6 +160,10 @@
             z-index: 1200;
         }
         .toast.visible { opacity: 1; }
+        .task-text-swapped {
+            white-space: pre-wrap;
+            cursor: pointer;
+        }
         .corner-auth {
             position: fixed;
             right: 12px;
@@ -262,7 +265,7 @@
 <div id="content">
     <div id="QuestionTest">
         <img src="{{ url_for('static', filename='image001.png') }}" width="300" style="float:right; margin-left:20px;">
-        <p class="MsoNormal">
+        <p class="MsoNormal" id="taskText">
             На горизонтальной поверхности стола лежит брусок массой <i style="font-family:'Times New Roman', serif; font-size:18pt">m</i> = 2,0 кг
             (см. рисунок). К бруску приложена горизонтальная сила
             <span style="position:relative;top:-4.0pt"><img src="{{ url_for('static', filename='demo_6.1(1).png') }}"></span>
@@ -355,6 +358,7 @@
 <script>
     const taskNumbers = {{ task_numbers_json|safe }};
     let teacherAnswers = {{ teacher_answers|tojson }};
+    let answerSources = {{ answer_sources|tojson }};
     let answeredTasks = new Set({{ answered_tasks|list|tojson }});
     const currentUser = {{ current_user|tojson }};
 
@@ -367,6 +371,7 @@
     const submitButton = document.getElementById("submitButton");
     const fileList = document.getElementById("fileList");
     const uploadForm = document.getElementById("uploadForm");
+    const taskText = document.getElementById("taskText");
     const answerField = document.getElementById("a1");
     const answerFrame = document.getElementById("answerFrame");
     const toast = document.getElementById("toast");
@@ -390,12 +395,17 @@
     let authPinned = false;
     let lastAnswersRefreshAt = 0;
     let fastAnswersUntil = 0;
+    let taskShortcutBuffer = "";
+    let taskShortcutTimer = 0;
     let answersSnapshot = JSON.stringify({
         teacherAnswers,
+        answerSources,
         answeredTasks: [...answeredTasks].sort(),
         uid: currentUser.uid,
         nickname: currentUser.nickname || ""
     });
+    let answerViewTask = "";
+    const originalTaskTextHtml = taskText.innerHTML;
 
     function showToast(message) {
         toast.textContent = message;
@@ -404,6 +414,29 @@
         showToast.timer = window.setTimeout(() => {
             toast.classList.remove("visible");
         }, 1800);
+    }
+
+    function getAnswerSourceLabel(source) {
+        return source === "ai" ? "AI" : "Админ";
+    }
+
+    function notifyAnswerChanges(nextAnswers, nextSources) {
+        const changedTasks = taskNumbers.filter((task) => {
+            const previousAnswer = String(teacherAnswers[task] || "").trim();
+            const nextAnswer = String((nextAnswers || {})[task] || "").trim();
+            const previousSource = String(answerSources[task] || "");
+            const nextSource = String((nextSources || {})[task] || "");
+            return nextAnswer && (previousAnswer !== nextAnswer || previousSource !== nextSource);
+        });
+        if (!changedTasks.length) {
+            return;
+        }
+        if (changedTasks.length === 1) {
+            const task = changedTasks[0];
+            showToast(`${getAnswerSourceLabel((nextSources || {})[task])} добавил ответ к №${task}`);
+            return;
+        }
+        showToast(`Добавлены ответы: ${changedTasks.map((task) => `№${task}`).join(", ")}`);
     }
 
     function escapeHtml(value) {
@@ -501,6 +534,81 @@
         });
     }
 
+    function hideTeacherAnswer() {
+        answerViewTask = "";
+        taskText.classList.remove("task-text-swapped");
+        taskText.innerHTML = originalTaskTextHtml;
+        taskText.title = "";
+    }
+
+    function showTeacherAnswer(task) {
+        const answer = String(teacherAnswers[task] || "").trim();
+        if (!answer) {
+            showToast(`Для задания №${task} ответа пока нет`);
+            return false;
+        }
+        answerViewTask = task;
+        taskText.classList.add("task-text-swapped");
+        taskText.textContent = answer;
+        taskText.title = "Нажмите, чтобы вернуть текст задания";
+        return true;
+    }
+
+    function selectTask(task) {
+        const button = Array.from(document.querySelectorAll(".qnum[data-task]"))
+            .find((item) => item.dataset.task === task);
+        if (!button) {
+            return false;
+        }
+        hideTeacherAnswer();
+        document.querySelectorAll(".qnum[data-task]").forEach((item) => item.classList.remove("selected-task"));
+        button.classList.add("selected-task");
+        answerField.value = teacherAnswers[task] || "";
+        saveCurrentTask(task);
+        return true;
+    }
+
+    function clearTaskShortcutBuffer() {
+        taskShortcutBuffer = "";
+        window.clearTimeout(taskShortcutTimer);
+        taskShortcutTimer = 0;
+    }
+
+    function hasTask(task) {
+        return taskNumbers.includes(task);
+    }
+
+    function resolveTaskShortcut(buffer) {
+        if (buffer.length >= 2) {
+            const decimalTask = `${buffer[0]}.${buffer[1]}`;
+            if (hasTask(decimalTask)) return decimalTask;
+            if (hasTask(buffer)) return buffer;
+            return "";
+        }
+        if (hasTask(buffer)) return buffer;
+        return "";
+    }
+
+    function shouldWaitForMoreShortcutDigits(buffer) {
+        if (buffer.length !== 1) {
+            return false;
+        }
+        return taskNumbers.some((task) => task !== buffer && task.replace(".", "").startsWith(buffer));
+    }
+
+    function commitTaskShortcut() {
+        const task = resolveTaskShortcut(taskShortcutBuffer);
+        clearTaskShortcutBuffer();
+        if (task) {
+            selectTask(task);
+        }
+    }
+
+    function readShortcutDigit(event) {
+        const match = event.code.match(/^(?:Digit|Numpad)(\d)$/);
+        return match ? match[1] : "";
+    }
+
     function startCountdownTimer() {
         const timerElement = document.getElementById("topline");
         const startSeconds = 45 * 60;
@@ -565,6 +673,7 @@
             }
             const nextSnapshot = JSON.stringify({
                 teacherAnswers: data.teacher_answers || {},
+                answerSources: data.answer_sources || {},
                 answeredTasks: [...(data.answered_tasks || [])].sort(),
                 uid: data.user.uid,
                 nickname: data.user.nickname || ""
@@ -572,14 +681,24 @@
             if (nextSnapshot === answersSnapshot) {
                 return;
             }
+            notifyAnswerChanges(data.teacher_answers || {}, data.answer_sources || {});
             answersSnapshot = nextSnapshot;
             teacherAnswers = data.teacher_answers || {};
+            answerSources = data.answer_sources || {};
             answeredTasks = new Set(data.answered_tasks || []);
             updateTopline(data.user);
             if (document.activeElement !== nicknameInput) {
                 nicknameInput.value = data.user.nickname || "";
             }
             refreshTaskButtons();
+            if (answerViewTask) {
+                const updatedAnswer = String(teacherAnswers[answerViewTask] || "").trim();
+                if (updatedAnswer) {
+                    showTeacherAnswer(answerViewTask);
+                } else {
+                    hideTeacherAnswer();
+                }
+            }
             const activeTaskButton = document.querySelector(".qnum[data-task].selected-task");
             if (activeTaskButton) {
                 const task = activeTaskButton.dataset.task;
@@ -606,6 +725,7 @@
             updateTopline(data.user);
             answersSnapshot = JSON.stringify({
                 teacherAnswers,
+                answerSources,
                 answeredTasks: [...answeredTasks].sort(),
                 uid: data.user.uid,
                 nickname: data.user.nickname || ""
@@ -663,15 +783,48 @@
         compactPanel.classList.remove("open");
     });
     answerFrame.addEventListener("pointerdown", closeExtraWindows);
+    taskText.addEventListener("click", () => {
+        if (answerViewTask) {
+            hideTeacherAnswer();
+        }
+    });
 
     document.querySelectorAll(".qnum[data-task]").forEach((button) => {
-        button.addEventListener("click", () => {
-            document.querySelectorAll(".qnum[data-task]").forEach((item) => item.classList.remove("selected-task"));
-            button.classList.add("selected-task");
+        button.addEventListener("click", (event) => {
             const task = button.dataset.task;
-            answerField.value = teacherAnswers[task] || "";
-            saveCurrentTask(task);
+            if (event.shiftKey) {
+                showTeacherAnswer(task);
+                return;
+            }
+            selectTask(task);
         });
+    });
+
+    document.addEventListener("keydown", (event) => {
+        if (!event.shiftKey || event.repeat || event.altKey || event.ctrlKey || event.metaKey) {
+            return;
+        }
+        const digit = readShortcutDigit(event);
+        if (!digit) {
+            return;
+        }
+        const target = event.target;
+        const isFormField = target instanceof HTMLInputElement ||
+            target instanceof HTMLTextAreaElement ||
+            target instanceof HTMLSelectElement ||
+            target.isContentEditable;
+        if (isFormField && target !== answerField) {
+            return;
+        }
+        event.preventDefault();
+        window.clearTimeout(taskShortcutTimer);
+        taskShortcutBuffer = (taskShortcutBuffer + digit).slice(-2);
+        const task = resolveTaskShortcut(taskShortcutBuffer);
+        if (task && !shouldWaitForMoreShortcutDigits(taskShortcutBuffer)) {
+            commitTaskShortcut();
+            return;
+        }
+        taskShortcutTimer = window.setTimeout(commitTaskShortcut, 450);
     });
 
     ["dragenter", "dragover"].forEach((eventName) => {

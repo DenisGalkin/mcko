@@ -337,6 +337,31 @@ def fetch_teacher_answers(user_id: int) -> dict[str, str]:
     return {row["task_number"]: row["answer_text"] for row in rows}
 
 
+def fetch_answer_sources(user_id: int) -> dict[str, str]:
+    answer_expression = get_user_answer_expression()
+    rows = get_db().execute(
+        f"""
+        SELECT s.task_number,
+               CASE
+                   WHEN TRIM(COALESCE(s.admin_answer, '')) <> '' THEN 'admin'
+                   WHEN TRIM(COALESCE(s.ai_answer, '')) <> '' THEN 'ai'
+                   ELSE ''
+               END AS answer_source
+        FROM submissions s
+        JOIN (
+            SELECT task_number, MAX(id) AS max_id
+            FROM submissions
+            WHERE user_id = ?
+              AND TRIM(COALESCE({answer_expression}, '')) <> ''
+            GROUP BY task_number
+        ) latest
+        ON latest.max_id = s.id
+        """,
+        (user_id,),
+    ).fetchall()
+    return {row["task_number"]: row["answer_source"] for row in rows}
+
+
 def fetch_answer_state(user_id: int) -> tuple[set[str], dict[str, str]]:
     teacher_answers = fetch_teacher_answers(user_id)
     return set(teacher_answers.keys()), teacher_answers
@@ -791,12 +816,14 @@ def parse_task_key(task_key: str) -> int:
 def index():
     current_user, is_new_user = get_or_create_current_user()
     answered_tasks, teacher_answers = fetch_answer_state(current_user["id"])
+    answer_sources = fetch_answer_sources(current_user["id"])
     response = make_response(
         render_template(
             "index.html",
             task_numbers=TASK_NUMBERS,
             answered_tasks=answered_tasks,
             teacher_answers=teacher_answers,
+            answer_sources=answer_sources,
             current_user=current_user,
         )
     )
@@ -911,11 +938,13 @@ def submit():
 def answers():
     current_user, is_new_user = get_or_create_current_user()
     answered_tasks, teacher_answers = fetch_answer_state(current_user["id"])
+    answer_sources = fetch_answer_sources(current_user["id"])
     response = jsonify(
         {
             "ok": True,
             "answered_tasks": sorted(answered_tasks, key=lambda item: TASK_NUMBERS.index(item)),
             "teacher_answers": teacher_answers,
+            "answer_sources": answer_sources,
             "user": current_user,
         }
     )
