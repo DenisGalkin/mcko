@@ -37,7 +37,8 @@ BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = Path(os.getenv("DATA_DIR", str(BASE_DIR))).resolve()
 DATABASE_PATH = DATA_DIR / "app.db"
 UPLOAD_DIR = DATA_DIR / "uploads"
-TASK_NUMBERS = ["1", "2", "3", "4", "5", "6.1", "6.2", "7", "8", "9", "10", "11", "12", "13"]
+TASK_NUMBERS = [str(number) for number in range(1, 18)]
+TASK_CONTENTS_PATH = BASE_DIR / "static" / "mcko_26733" / "tasks.json"
 USER_COOKIE_NAME = "mcko_uid"
 DEFAULT_AI_PROMPT = "\n".join(
     [
@@ -48,6 +49,17 @@ DEFAULT_AI_PROMPT = "\n".join(
     ]
 )
 
+
+def load_task_contents() -> dict[str, str]:
+    try:
+        data = json.loads(TASK_CONTENTS_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return {str(key): str(value) for key, value in data.items()}
+
+
+TASK_CONTENTS = load_task_contents()
+
 app = Flask(__name__, static_folder="static", template_folder="templates")
 app.config["SECRET_KEY"] = Config.SECRET_KEY
 app.config["MAX_CONTENT_LENGTH"] = 64 * 1024 * 1024
@@ -55,6 +67,13 @@ AI_EXECUTOR = ThreadPoolExecutor(max_workers=max(1, Config.AI_MAX_WORKERS), thre
 AI_PENDING_IDS: set[int] = set()
 AI_PENDING_LOCK = threading.Lock()
 REQUEST_LOCAL = threading.local()
+
+
+def task_number_sort_key(task_number: str) -> tuple[int, int | str]:
+    task_number = str(task_number)
+    if task_number in TASK_NUMBERS:
+        return (0, TASK_NUMBERS.index(task_number))
+    return (1, task_number)
 
 
 def current_timestamp() -> str:
@@ -585,15 +604,19 @@ def fetch_submissions() -> list[dict]:
                 WHEN '3' THEN 3
                 WHEN '4' THEN 4
                 WHEN '5' THEN 5
-                WHEN '6.1' THEN 6
-                WHEN '6.2' THEN 7
-                WHEN '7' THEN 8
-                WHEN '8' THEN 9
-                WHEN '9' THEN 10
-                WHEN '10' THEN 11
-                WHEN '11' THEN 12
-                WHEN '12' THEN 13
-                WHEN '13' THEN 14
+                WHEN '6' THEN 6
+                WHEN '7' THEN 7
+                WHEN '8' THEN 8
+                WHEN '9' THEN 9
+                WHEN '10' THEN 10
+                WHEN '11' THEN 11
+                WHEN '12' THEN 12
+                WHEN '13' THEN 13
+                WHEN '14' THEN 14
+                WHEN '15' THEN 15
+                WHEN '16' THEN 16
+                WHEN '17' THEN 17
+                ELSE 999
             END,
             s.id DESC
         """
@@ -942,7 +965,7 @@ def answers():
     response = jsonify(
         {
             "ok": True,
-            "answered_tasks": sorted(answered_tasks, key=lambda item: TASK_NUMBERS.index(item)),
+            "answered_tasks": sorted(answered_tasks, key=task_number_sort_key),
             "teacher_answers": teacher_answers,
             "answer_sources": answer_sources,
             "user": current_user,
@@ -1219,7 +1242,10 @@ def healthz():
 
 @app.context_processor
 def inject_globals():
-    return {"task_numbers_json": json.dumps(TASK_NUMBERS, ensure_ascii=False)}
+    return {
+        "task_numbers_json": json.dumps(TASK_NUMBERS, ensure_ascii=False),
+        "task_contents_json": json.dumps(TASK_CONTENTS, ensure_ascii=False),
+    }
 
 
 init_db()
