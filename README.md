@@ -78,7 +78,7 @@ mcko/
 ├── Caddyfile               # Конфигурация обратного прокси
 ├── .env.example            # Пример переменных окружения
 ├── uploads/                # Загруженные файлы (создается автоматически)
-├── mcko.db                 # База данных SQLite (создается автоматически)
+├── app.db                  # База данных SQLite (создается автоматически)
 ├── static/                 # Статические файлы
 │   ├── admin.js
 │   ├── main7.css
@@ -115,36 +115,31 @@ curl http://localhost:5000/healthz
 
 ```bash
 # Вход в админку
-curl -X POST http://localhost:5000/admin/login \
-  -H "Content-Type: application/json" \
-  -d '{"password": "admin123"}'
+curl -i -c cookies.txt -X POST http://localhost:5000/admin/login \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "password=admin123"
 
 # Получение списка отправок
-curl http://localhost:5000/admin
+curl -b cookies.txt http://localhost:5000/api/tasks
 ```
 
 ### Тестирование отправки задания
 
 ```bash
 # Отправка задания от пользователя
-curl -X POST http://localhost:5000/api/submit \
-  -H "Content-Type: application/json" \
-  -d '{
-    "uid": "1234",
-    "nickname": "test_student",
-    "task_number": 1,
-    "text_content": "Привет, это мое задание!"
-  }'
+curl -X POST http://localhost:5000/submit \
+  -F "task_number=1" \
+  -F "text_content=Привет, это мое задание!"
 ```
 
 ### Тестирование AI (если настроен)
 
 ```bash
-# Проверка настроек AI
-curl http://localhost:5000/api/ai-status
-
 # Генерация AI-ответа для конкретной отправки
-curl -X POST http://localhost:5000/admin/submission/1/generate-ai
+curl -b cookies.txt -X POST http://localhost:5000/admin/submission/1/generate-ai
+
+# Ошибки фоновой генерации пишутся в логи приложения
+docker compose logs app
 ```
 
 ## 🔐 Админ-панель
@@ -160,17 +155,24 @@ curl -X POST http://localhost:5000/admin/submission/1/generate-ai
 
 | Метод | Endpoint | Описание |
 |---|---|---|
-| POST | `/api/submit` | Отправить задание |
-| GET | `/api/submission/<uid>/<task_number>` | Получить отправку |
+| GET | `/` | Главная страница ученика |
+| POST | `/profile` | Сохранить никнейм ученика |
+| POST | `/profile/current-task` | Сохранить текущий номер задания ученика |
+| POST | `/submit` | Отправить задание |
+| GET | `/answers` | Получить ответы текущего ученика |
+| GET | `/my-summary` | Получить сводку загрузок текущего ученика |
 | POST | `/admin/login` | Вход в админку |
 | POST | `/admin/logout` | Выход из админки |
 | GET | `/admin` | Список отправок |
-| PATCH | `/api/tasks/<submission_id>` | Обновить отправку |
+| GET | `/admin/settings` | Настройки AI |
+| GET | `/api/tasks` | Получить список отправок для админки |
+| PATCH | `/api/tasks/<task_key>` | Обновить ответ администратора |
 | POST | `/admin/submission/<id>/answer` | Сохранить ответ |
 | POST | `/admin/submission/<id>/generate-ai` | Генерировать AI-ответ |
 | POST | `/api/admin/settings/ai` | Настройки AI |
 | POST | `/api/ai-allowed` | Добавить никнейм в белый список |
 | DELETE | `/api/ai-allowed/<nickname>` | Удалить никнейм из белого списка |
+| GET | `/files/<filename>` | Открыть загруженный файл |
 | GET | `/healthz` | Проверка здоровья |
 
 ## 🔄 AI-ответы
@@ -185,7 +187,7 @@ AI-ответы генерируются асинхронно через ThreadP
 
 ```bash
 # Удаление базы данных и загруженных файлов
-rm mcko.db
+rm app.db
 rm -rf uploads/*
 
 # Остановка Docker сервисов
