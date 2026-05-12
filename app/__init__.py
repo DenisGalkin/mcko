@@ -1,0 +1,1 @@
+"""MCKO Flask application package."""

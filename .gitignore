@@ -233,6 +233,7 @@ dmypy.json
 
 # pytype static type analyzer
 .pytype/
+.codex_deps/
 
 # Cython debug symbols
 cython_debug/
@@ -254,4 +255,11 @@ poetry.toml
 # LSP config files
 pyrightconfig.json
 
-/uploads
+/data/uploads/
+/data/*.db
+/data/*.db-shm
+/data/*.db-wal
+/uploads/
+/app.db
+/app.db-shm
+/app.db-wal

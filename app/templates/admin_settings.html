@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <title>Настройки админки</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin-dashboard.css') }}">
 </head>
 <body class="admin_settings_body">
     <div class="settings_page">
@@ -69,7 +69,7 @@
                     <div class="kv-row"><span>OpenAI ключ задан</span><strong>{{ 'Да' if config_view.OPENAI_API_KEY_SET else 'Нет' }}</strong></div>
                     <div class="kv-row"><span>Пароль админки задан</span><strong>{{ 'Да' if config_view.ADMIN_PASSWORD_SET else 'Нет' }}</strong></div>
                     <div class="kv-row"><span>API URL</span><strong>{{ config_view.OPENAI_API_URL }}</strong></div>
-                    <div class="kv-row"><span>Источник API ключа</span><strong>config.py / env</strong></div>
+                    <div class="kv-row"><span>Источник API ключа</span><strong>app/config.py / env</strong></div>
                 </div>
             </section>
         </div>

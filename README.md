@@ -1,195 +1,122 @@
-# MCKO — Система для отправки заданий и получения ответов
+# MCKO
 
-Веб-приложение для учеников и учителей. Ученики отправляют задания по номерам и получают ответы от учителя или AI. Учителя просматривают отправки и дают ответы через админ-панель.
+Веб-приложение для отправки школьных заданий, проверки работ в админ-панели и выдачи ответов от учителя или AI.
 
-## 🚀 Возможности
+## Возможности
 
-- **Автоматическая идентификация** — каждый пользователь получает уникальный 4-значный ID (сохраняется в cookie)
-- **Отправка заданий** — поддержка 14 номеров заданий (1, 2, 3, 4, 5, 6.1, 6.2, 7-13)
-- **Загрузка файлов** — можно прикреплять файлы к заданию
-- **Получение ответов** — отображение ответов от учителя или AI
-- **AI-ответы** — автоматическое генерирование ответов через OpenAI API
-- **Админ-панель** — просмотр и управление всеми отправками
-- **Настройки AI** — включение/выключение, настройка модели и промпта
+- автоматический 4-значный ID пользователя в cookie;
+- отправка текста и файлов по номерам заданий `1`-`13`, включая `6.1` и `6.2`;
+- просмотр своих загрузок и полученных ответов;
+- админ-панель для проверки, фильтрации и ответа на работы;
+- белый список никнеймов для AI-ответов;
+- настройки модели, промпта и включения AI из админки;
+- SQLite с WAL и настройками таймаутов.
 
-## 📋 Требования
-
-- Python 3.9+
-- Docker и Docker Compose (опционально, для контейнерного развёртывания)
-- OpenAI API ключ (опционально, для AI-ответов)
-
-## 🛠️ Установка
-
-### Вариант 1: Локальный запуск
+## Быстрый запуск
 
 ```bash
-# Создание виртуального окружения
 python -m venv venv
-source venv/bin/activate  # На Windows: venv\Scripts\activate
-
-# Установка зависимостей
+venv\Scripts\activate
 pip install -r requirements.txt
-
-# Создание файла .env (см. ниже раздел "Переменные окружения")
-cp .env.example .env
-
-# Запуск
-python app.py
+copy .env.example .env
+python main.py
 ```
 
-Приложение будет доступно по адресу: `http://localhost:5000`
+Локальный адрес: `http://localhost:5000`.
 
-### Вариант 2: Docker Compose
+## Docker Compose
 
 ```bash
-# Создание файла .env
-cp .env.example .env
-
-# Запуск всех сервисов
+copy .env.example .env
 docker compose up -d
 ```
 
-Приложение будет доступно по адресу: `http://localhost` (через Caddy)
+Приложение будет доступно через Caddy: `http://localhost`.
 
-## ⚙️ Переменные окружения
+## Структура проекта
 
-| Переменная | Описание | Значение по умолчанию |
+```text
+mcko/
+├── app/
+│   ├── __init__.py
+│   ├── web.py                    # Flask routes, AI orchestration, app entrypoint
+│   ├── config.py                 # Environment-based config
+│   ├── settings.py               # Paths, task numbers, shared constants
+│   ├── database.py               # SQLAlchemy schema and queries
+│   ├── submission_service.py     # Upload and submission workflow helpers
+│   ├── templates/
+│   │   ├── student_exam.html
+│   │   ├── admin_dashboard.html
+│   │   ├── admin_login.html
+│   │   └── admin_settings.html
+│   └── static/
+│       ├── css/
+│       ├── js/
+│       ├── images/
+│       └── vendor/
+├── data/                         # Runtime data, ignored by git
+│   ├── app.db
+│   └── uploads/
+├── requirements.txt
+├── Dockerfile
+├── docker-compose.yml
+├── Caddyfile
+└── .env.example
+```
+
+По умолчанию runtime-данные лежат в `data/`. В Docker используется volume `/data`.
+
+## Переменные окружения
+
+| Переменная | Описание | По умолчанию |
 |---|---|---|
 | `SECRET_KEY` | Секретный ключ Flask | `mcko-local-secret` |
-| `ADMIN_PASSWORD` | Пароль для админ-панели | `admin123` |
+| `ADMIN_PASSWORD` | Пароль админ-панели | `admin123` |
+| `DATA_DIR` | Папка базы и загрузок | `./data` |
 | `AI_ENABLED` | Включить AI | `1` |
-| `OPENAI_API_KEY` | API ключ OpenAI | `` |
+| `OPENAI_API_KEY` | API ключ OpenAI | пусто |
 | `OPENAI_MODEL` | Модель OpenAI | `gpt-5.4-mini` |
 | `OPENAI_API_URL` | URL OpenAI API | `https://api.openai.com/v1` |
-| `OPENAI_MAX_OUTPUT_TOKENS` | Макс. токенов в ответе | `2048` |
-| `OPENAI_MAX_RETRIES` | Макс. попыток ретрай | `2` |
-| `AI_MAX_WORKERS` | Поток для AI задач | `15` |
+| `OPENAI_MAX_OUTPUT_TOKENS` | Максимум токенов ответа | `2048` |
+| `OPENAI_MAX_RETRIES` | Количество повторов API-запроса | `2` |
+| `AI_MAX_WORKERS` | Число фоновых AI-потоков | `15` |
 | `SQLITE_TIMEOUT_SECONDS` | Таймаут SQLite | `60` |
+| `SQLITE_CACHE_KB` | SQLite cache size | `32768` |
 
-## 📁 Структура проекта
-
-```
-mcko/
-├── app.py                  # Основное приложение Flask
-├── config.py               # Конфигурация
-├── requirements.txt        # Зависимости
-├── Dockerfile              # Docker образ
-├── docker-compose.yml      # Оркестрация
-├── Caddyfile               # Конфигурация обратного прокси
-├── .env.example            # Пример переменных окружения
-├── uploads/                # Загруженные файлы (создается автоматически)
-├── app.db                  # База данных SQLite (создается автоматически)
-├── static/                 # Статические файлы
-│   ├── admin.js
-│   ├── main7.css
-│   └── ...
-└── templates/              # HTML шаблоны
-    ├── index.html          # Главная страница (ученик)
-    ├── admin.html          # Админ-панель
-    ├── admin_settings.html # Настройки админа
-    └── admin_login.html    # Вход в админку
-```
-
-## 🗄️ База данных
-
-Используется SQLite с оптимизациями (WAL mode, custom timeout, shared cache).
-
-Основные таблицы:
-- **users** — пользователи (uid, nickname, current_task)
-- **submissions** — отправки заданий (task_number, text_content, admin_answer, ai_answer)
-- **submission_files** — прикреплённые файлы
-- **ai_allowed_nicknames** — никнеймы с доступом к AI
-- **app_settings** — настройки приложения
-
-## 🧪 Тесты
-
-### Проверка здоровья приложения
-
-```bash
-curl http://localhost:5000/healthz
-```
-
-Ожидаемый ответ: `{"ok":true}`
-
-### Тестирование админ-панели
-
-```bash
-# Вход в админку
-curl -i -c cookies.txt -X POST http://localhost:5000/admin/login \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "password=admin123"
-
-# Получение списка отправок
-curl -b cookies.txt http://localhost:5000/api/tasks
-```
-
-### Тестирование отправки задания
-
-```bash
-# Отправка задания от пользователя
-curl -X POST http://localhost:5000/submit \
-  -F "task_number=1" \
-  -F "text_content=Привет, это мое задание!"
-```
-
-### Тестирование AI (если настроен)
-
-```bash
-# Генерация AI-ответа для конкретной отправки
-curl -b cookies.txt -X POST http://localhost:5000/admin/submission/1/generate-ai
-
-# Ошибки фоновой генерации пишутся в логи приложения
-docker compose logs app
-```
-
-## 🔐 Админ-панель
-
-Доступ: `http://localhost:5000/admin`
-
-1. Введите пароль администратора (по умолчанию: `admin123`)
-2. Просматривайте отправки пользователей
-3. Дайте ответ на задание
-4. Настройте AI в разделе настроек
-
-## 📡 API Endpoints
+## Основные адреса
 
 | Метод | Endpoint | Описание |
 |---|---|---|
-| GET | `/` | Главная страница ученика |
-| POST | `/profile` | Сохранить никнейм ученика |
-| POST | `/profile/current-task` | Сохранить текущий номер задания ученика |
-| POST | `/submit` | Отправить задание |
-| GET | `/answers` | Получить ответы текущего ученика |
-| GET | `/my-summary` | Получить сводку загрузок текущего ученика |
-| POST | `/admin/login` | Вход в админку |
-| POST | `/admin/logout` | Выход из админки |
-| GET | `/admin` | Список отправок |
-| GET | `/admin/settings` | Настройки AI |
-| GET | `/api/tasks` | Получить список отправок для админки |
-| PATCH | `/api/tasks/<task_key>` | Обновить ответ администратора |
-| POST | `/admin/submission/<id>/answer` | Сохранить ответ |
-| POST | `/admin/submission/<id>/generate-ai` | Генерировать AI-ответ |
-| POST | `/api/admin/settings/ai` | Настройки AI |
-| POST | `/api/ai-allowed` | Добавить никнейм в белый список |
-| DELETE | `/api/ai-allowed/<nickname>` | Удалить никнейм из белого списка |
-| GET | `/files/<filename>` | Открыть загруженный файл |
-| GET | `/healthz` | Проверка здоровья |
+| `GET` | `/` | Страница ученика |
+| `POST` | `/profile` | Сохранить никнейм |
+| `POST` | `/profile/current-task` | Сохранить текущий номер задания |
+| `POST` | `/submit` | Отправить задание |
+| `GET` | `/answers` | Получить ответы текущего ученика |
+| `GET` | `/my-summary` | Сводка загрузок и ответов |
+| `GET` | `/admin` | Админ-панель |
+| `GET`, `POST` | `/admin/login` | Вход в админку |
+| `GET` | `/admin/settings` | Настройки AI |
+| `GET` | `/api/tasks` | Список отправок |
+| `PATCH` | `/api/tasks/<task_key>` | Обновить ответ |
+| `POST` | `/admin/submission/<id>/generate-ai` | Сгенерировать AI-ответ |
+| `GET` | `/files/<filename>` | Открыть загруженный файл |
+| `GET` | `/healthz` | Healthcheck |
 
-## 🔄 AI-ответы
-
-AI-ответы генерируются асинхронно через ThreadPoolExecutor. Для этого необходимо:
-
-1. Установить `OPENAI_API_KEY`
-2. Включить AI (`AI_ENABLED=1`)
-3. Добавить никнейм в белый список через админ-панель
-
-## 🧹 Очистка
+## Проверка
 
 ```bash
-# Удаление базы данных и загруженных файлов
-rm app.db
-rm -rf uploads/*
+python -m compileall app
+python main.py
+curl http://localhost:5000/healthz
+```
 
-# Остановка Docker сервисов
-docker compose down
+Ожидаемый healthcheck: `{"ok":true}`.
+
+## Очистка runtime-данных
+
+Остановите приложение, затем удалите ненужные файлы из `data/`:
+
+```bash
+del data\app.db*
+rmdir /s /q data\uploads
 ```

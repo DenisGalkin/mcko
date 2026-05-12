@@ -6,8 +6,8 @@ from typing import Iterable
 
 from werkzeug.utils import secure_filename
 
-import database
-from constants import TASK_NUMBERS, UPLOAD_DIR
+from . import database
+from .settings import TASK_NUMBERS, UPLOAD_DIR
 
 
 def allocate_task_numbers(user_id: int, start_task: str | None, count: int) -> list[str]:

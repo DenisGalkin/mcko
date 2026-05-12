@@ -4,7 +4,7 @@
         <meta charset="UTF-8" />
         <title>Admin | Задания</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/admin-dashboard.css') }}" />
     </head>
     <body class="admin_body">
         <div class="admin_mobile_bar" aria-label="Мобильная навигация">
@@ -148,6 +148,6 @@
             window.adminInitialTasks = {{ submissions|tojson }};
             window.adminInitialAiAllowed = {{ ai_allowed_nicknames|tojson }};
         </script>
-        <script src="{{ url_for('static', filename='admin.js') }}"></script>
+        <script src="{{ url_for('static', filename='js/admin-dashboard.js') }}"></script>
     </body>
 </html>

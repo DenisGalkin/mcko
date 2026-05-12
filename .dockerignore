@@ -6,6 +6,9 @@ __pycache__
 app.db
 app.db-*
 uploads
+data/*.db
+data/*.db-*
+data/uploads
 logs
 .env
 *.log

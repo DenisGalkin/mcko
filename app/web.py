@@ -7,7 +7,6 @@ import mimetypes
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
 
 import requests
 from flask import (
@@ -23,14 +22,14 @@ from flask import (
     url_for,
 )
 
-import database
-import services
-from config import Config
-from constants import DEFAULT_AI_PROMPT, TASK_NUMBERS, UPLOAD_DIR, USER_COOKIE_NAME
+from . import database
+from . import submission_service
+from .config import Config
+from .settings import DEFAULT_AI_PROMPT, TASK_NUMBERS, UPLOAD_DIR, USER_COOKIE_NAME
 
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__, static_folder="static", template_folder="templates")
+app = Flask(__name__)
 app.config["SECRET_KEY"] = Config.SECRET_KEY
 app.config["MAX_CONTENT_LENGTH"] = 64 * 1024 * 1024
 AI_EXECUTOR = ThreadPoolExecutor(max_workers=max(1, Config.AI_MAX_WORKERS), thread_name_prefix="ai-answer")
@@ -254,7 +253,7 @@ def index():
     answer_sources = database.fetch_answer_sources(current_user["id"])
     response = make_response(
         render_template(
-            "index.html",
+            "student_exam.html",
             task_numbers=TASK_NUMBERS,
             answered_tasks=answered_tasks,
             teacher_answers=teacher_answers,
@@ -322,7 +321,7 @@ def submit():
 
     item_count = max(len(uploaded_files), 1)
     try:
-        assigned_tasks = services.allocate_task_numbers(current_user["id"], selected_task, item_count)
+        assigned_tasks = submission_service.allocate_task_numbers(current_user["id"], selected_task, item_count)
     except ValueError as error:
         response = jsonify({"ok": False, "error": str(error)})
         if is_new_user:
@@ -332,9 +331,11 @@ def submit():
     created_ids: list[int] = []
     if uploaded_files:
         for index, file_storage in enumerate(uploaded_files):
-            created_ids.append(services.upsert_submission(current_user, assigned_tasks[index], text_content, [file_storage]))
+            created_ids.append(
+                submission_service.upsert_submission(current_user, assigned_tasks[index], text_content, [file_storage])
+            )
     else:
-        created_ids.append(services.upsert_submission(current_user, assigned_tasks[0], text_content, []))
+        created_ids.append(submission_service.upsert_submission(current_user, assigned_tasks[0], text_content, []))
     database.commit()
 
     ai_queued = maybe_schedule_ai_for_user(current_user, created_ids)
@@ -398,7 +399,7 @@ def admin():
     if gate is not None:
         return gate
     return render_template(
-        "admin.html",
+        "admin_dashboard.html",
         submissions=database.fetch_submissions(),
         ai_allowed_nicknames=database.fetch_allowed_nicknames(),
         ai_enabled=bool(database.get_ai_settings()["enabled"] and Config.OPENAI_API_KEY),
@@ -505,7 +506,7 @@ def patch_task(task_key: str):
     if gate is not None:
         return jsonify({"ok": False, "error": "Нужен вход в админку"}), 401
     try:
-        submission_id = services.parse_task_key(task_key)
+        submission_id = submission_service.parse_task_key(task_key)
     except ValueError as error:
         return jsonify({"ok": False, "error": str(error)}), 400
 

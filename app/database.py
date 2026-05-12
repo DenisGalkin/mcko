@@ -21,8 +21,8 @@ from sqlalchemy import (
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, scoped_session, sessionmaker
 
-from config import Config
-from constants import DATABASE_PATH, DATA_DIR, DEFAULT_AI_PROMPT
+from .config import Config
+from .settings import DATABASE_PATH, DATA_DIR, DEFAULT_AI_PROMPT
 
 
 metadata = MetaData()

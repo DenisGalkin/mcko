@@ -4,15 +4,15 @@
     <meta charset="UTF-8">
     <title>Компьютерное тестирование</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link href="{{ url_for('static', filename='main7.css') }}" rel="stylesheet" type="text/css">
-    <link href="{{ url_for('static', filename='virt_kb.css') }}" rel="stylesheet" type="text/css">
-    <link href="{{ url_for('static', filename='mpu.css') }}" rel="stylesheet" type="text/css">
-    <link href="{{ url_for('static', filename='kim.css') }}" rel="stylesheet" type="text/css">
-    <script src="{{ url_for('static', filename='jquery.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='virt_kb.js') }}"></script>
+    <link href="{{ url_for('static', filename='css/exam-layout.css') }}" rel="stylesheet" type="text/css">
+    <link href="{{ url_for('static', filename='css/virtual-keyboard.css') }}" rel="stylesheet" type="text/css">
+    <link href="{{ url_for('static', filename='css/exam-question.css') }}" rel="stylesheet" type="text/css">
+    <link href="{{ url_for('static', filename='css/legacy-kim.css') }}" rel="stylesheet" type="text/css">
+    <script src="{{ url_for('static', filename='vendor/jquery.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/virtual-keyboard.js') }}"></script>
     <style>
         body {
-            background: #ffffff url("{{ url_for('static', filename='bg.png') }}") repeat fixed 0 0;
+            background: #ffffff url("{{ url_for('static', filename='images/page-background.png') }}") repeat fixed 0 0;
             background-size: 560px auto;
         }
         .flash-wrap { margin: 16px 15px 0; width: 1020px; }
@@ -264,11 +264,11 @@
 
 <div id="content">
     <div id="QuestionTest">
-        <img src="{{ url_for('static', filename='image001.png') }}" width="300" style="float:right; margin-left:20px;">
+        <img src="{{ url_for('static', filename='images/friction-block.png') }}" width="300" style="float:right; margin-left:20px;">
         <p class="MsoNormal" id="taskText">
             На горизонтальной поверхности стола лежит брусок массой <i style="font-family:'Times New Roman', serif; font-size:18pt">m</i> = 2,0 кг
             (см. рисунок). К бруску приложена горизонтальная сила
-            <span style="position:relative;top:-4.0pt"><img src="{{ url_for('static', filename='demo_6.1(1).png') }}"></span>
+            <span style="position:relative;top:-4.0pt"><img src="{{ url_for('static', filename='images/force-vector.png') }}"></span>
             под действием которой брусок движется по поверхности стола с ускорением
             <i style="font-family:'Times New Roman', serif; font-size:18pt">а</i> = 2 м/с<sup>2</sup>.
             Коэффициент трения между бруском и поверхностью стола
