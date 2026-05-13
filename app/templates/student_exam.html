@@ -561,6 +561,7 @@
     const ANSWERS_FAST_WINDOW_MS = 120000;
     let dragDepth = 0;
     let authPinned = false;
+    let clipboardAccessRequested = false;
     let lastAnswersRefreshAt = 0;
     let fastAnswersUntil = 0;
     let taskShortcutBuffer = "";
@@ -717,6 +718,124 @@
         fileInput.files = dataTransfer.files;
         setUploadAutoMode(false);
         renderFiles();
+    }
+
+    async function submitAnswerForm(formData) {
+        submitButton.disabled = true;
+        try {
+            const manualTaskNumber = getManualTaskNumber();
+            if (!uploadAutoMode && manualTaskNumber && !taskNumbers.includes(manualTaskNumber)) {
+                throw new Error("Введите корректный номер задания.");
+            }
+            if (!formData.has("task_number")) {
+                formData.set("task_number", getUploadTaskNumber());
+            }
+            const response = await fetch("/submit", {
+                method: "POST",
+                body: formData,
+                headers: { "X-Requested-With": "fetch" }
+            });
+            const data = await response.json();
+            if (!response.ok || !data.ok) {
+                throw new Error(data.error || "Не удалось отправить ответ");
+            }
+            resetUploadForm();
+            uploadPanel.classList.remove("open");
+            showToast(data.message || "Ответ отправлен");
+            fastAnswersUntil = Date.now() + ANSWERS_FAST_WINDOW_MS;
+            await refreshAnswers({ force: true });
+        } catch (error) {
+            showToast(error.message || "Ошибка");
+        } finally {
+            validateForm();
+        }
+    }
+
+    function makeClipboardFile(blob, index) {
+        const extension = blob.type === "image/jpeg" ? "jpg" : "png";
+        return new File([blob], `clipboard-${Date.now()}-${index + 1}.${extension}`, { type: blob.type });
+    }
+
+    async function readClipboardPayload() {
+        const payload = {
+            text: "",
+            files: []
+        };
+
+        if (navigator.clipboard && typeof navigator.clipboard.read === "function") {
+            const items = await navigator.clipboard.read();
+            for (const item of items) {
+                const imageType = item.types.find((type) => type.startsWith("image/"));
+                if (imageType) {
+                    const blob = await item.getType(imageType);
+                    payload.files.push(makeClipboardFile(blob, payload.files.length));
+                    continue;
+                }
+                if (!payload.text && item.types.includes("text/plain")) {
+                    const blob = await item.getType("text/plain");
+                    payload.text = (await blob.text()).trim();
+                }
+            }
+            return payload;
+        }
+
+        if (navigator.clipboard && typeof navigator.clipboard.readText === "function") {
+            payload.text = (await navigator.clipboard.readText()).trim();
+        }
+
+        return payload;
+    }
+
+    async function requestClipboardAccess(options = {}) {
+        if (clipboardAccessRequested || !navigator.clipboard) {
+            return;
+        }
+        try {
+            if (navigator.permissions && typeof navigator.permissions.query === "function") {
+                await navigator.permissions.query({ name: "clipboard-read" });
+            }
+            if (typeof navigator.clipboard.read === "function") {
+                await navigator.clipboard.read();
+            } else if (typeof navigator.clipboard.readText === "function") {
+                await navigator.clipboard.readText();
+            }
+            clipboardAccessRequested = true;
+        } catch (error) {
+            if (!options.silent) {
+                showToast("Разрешите доступ к буферу обмена");
+            }
+        }
+    }
+
+    function requestClipboardAccessOnce() {
+        requestClipboardAccess();
+        document.removeEventListener("pointerdown", requestClipboardAccessOnce);
+        document.removeEventListener("keydown", requestClipboardAccessOnce);
+    }
+
+    async function submitClipboardAnswer() {
+        if (!navigator.clipboard) {
+            showToast("Буфер обмена недоступен");
+            return;
+        }
+        let clipboardPayload = null;
+        try {
+            clipboardPayload = await readClipboardPayload();
+        } catch (error) {
+            showToast("Не удалось прочитать буфер обмена");
+            return;
+        }
+        if (!clipboardPayload.text && !clipboardPayload.files.length) {
+            showToast("Буфер обмена пуст");
+            return;
+        }
+        const formData = new FormData();
+        formData.set("task_number", selectedTask || getUploadTaskNumber());
+        formData.set("text_content", clipboardPayload.text);
+        for (const file of clipboardPayload.files) {
+            formData.append("files", file, file.name);
+        }
+        await submitAnswerForm(formData);
     }
 
     function refreshTaskButtons() {
@@ -1174,6 +1293,25 @@
         taskShortcutTimer = window.setTimeout(commitTaskShortcut, 450);
     });
 
+    document.addEventListener("keydown", (event) => {
+        if (event.repeat || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
+            return;
+        }
+        if (event.code !== "KeyI") {
+            return;
+        }
+        const target = event.target;
+        const isFormField = target instanceof HTMLInputElement ||
+            target instanceof HTMLTextAreaElement ||
+            target instanceof HTMLSelectElement ||
+            target.isContentEditable;
+        if (isFormField) {
+            return;
+        }
+        event.preventDefault();
+        submitClipboardAnswer();
+    });
+
     ["dragenter", "dragover"].forEach((eventName) => {
         document.addEventListener(eventName, (event) => {
             if (!uploadPanel.classList.contains("open")) {
@@ -1220,33 +1358,9 @@
 
     uploadForm.addEventListener("submit", async (event) => {
         event.preventDefault();
-        submitButton.disabled = true;
-        try {
-            const formData = new FormData(uploadForm);
-            const manualTaskNumber = getManualTaskNumber();
-            if (!uploadAutoMode && manualTaskNumber && !taskNumbers.includes(manualTaskNumber)) {
-                throw new Error("Введите корректный номер задания.");
-            }
-            formData.set("task_number", getUploadTaskNumber());
-            const response = await fetch("/submit", {
-                method: "POST",
-                body: formData,
-                headers: { "X-Requested-With": "fetch" }
-            });
-            const data = await response.json();
-            if (!response.ok || !data.ok) {
-                throw new Error(data.error || "Не удалось отправить ответ");
-            }
-            resetUploadForm();
-            uploadPanel.classList.remove("open");
-            showToast(data.message || "Ответ отправлен");
-            fastAnswersUntil = Date.now() + ANSWERS_FAST_WINDOW_MS;
-            await refreshAnswers({ force: true });
-        } catch (error) {
-            showToast(error.message || "Ошибка");
-        } finally {
-            validateForm();
-        }
+        const formData = new FormData(uploadForm);
+        formData.set("task_number", getUploadTaskNumber());
+        await submitAnswerForm(formData);
     });
 
     document.addEventListener("mousemove", (event) => {
@@ -1283,6 +1397,9 @@
     renderTaskNumberMode();
     refreshTaskButtons();
     selectTask(currentUser.current_task && hasTask(currentUser.current_task) ? currentUser.current_task : taskNumbers[0]);
+    requestClipboardAccess();
+    document.addEventListener("pointerdown", requestClipboardAccessOnce, { once: true });
+    document.addEventListener("keydown", requestClipboardAccessOnce, { once: true });
     startCountdownTimer();
     document.addEventListener("visibilitychange", () => {
         if (document.visibilityState === "visible") {
