@@ -155,27 +155,36 @@ class AiJobRunner:
         return queued
 
     def run_auto_generation(self, submission_id: int) -> None:
-        local_session = None
         try:
             max_attempts = max(1, Config.AI_JOB_MAX_ATTEMPTS)
             retry_delays = Config.AI_JOB_RETRY_DELAYS_SECONDS or [15, 60, 180]
             for attempt in range(max_attempts):
                 try:
-                    local_session = db_session.create_session()
-                    submission = submissions.fetch_submission(submission_id, local_session)
+                    read_session = db_session.create_session()
+                    try:
+                        submission = submissions.fetch_submission(submission_id, read_session)
+                        ai_settings = settings.get_ai_settings(read_session)
+                    finally:
+                        read_session.close()
                     if not submission:
                         return
-                    answer_text = self.ai_service.generate_answer_for_submission(
-                        submission,
-                        settings.get_ai_settings(local_session),
-                    )
-                    submissions.update_submission_ai_answer(
-                        submission_id,
-                        answer_text,
-                        set_answered_at_if_empty=True,
-                        session=local_session,
-                    )
-                    local_session.commit()
+
+                    answer_text = self.ai_service.generate_answer_for_submission(submission, ai_settings)
+
+                    write_session = db_session.create_session()
+                    try:
+                        submissions.update_submission_ai_answer(
+                            submission_id,
+                            answer_text,
+                            set_answered_at_if_empty=True,
+                            session=write_session,
+                        )
+                        write_session.commit()
+                    except Exception:
+                        write_session.rollback()
+                        raise
+                    finally:
+                        write_session.close()
                     return
                 except Exception as error:
                     if attempt >= max_attempts - 1:
@@ -193,23 +202,12 @@ class AiJobRunner:
                         error,
                         exc_info=True,
                     )
-                    try:
-                        if local_session is not None:
-                            local_session.close()
-                    except Exception:
-                        pass
-                    local_session = None
                     time.sleep(retry_delays[min(attempt, len(retry_delays) - 1)])
         except Exception:
             logger.exception("Unexpected AI generation worker failure for submission %s", submission_id)
         finally:
             with self.pending_lock:
                 self.pending_ids.discard(submission_id)
-            try:
-                if local_session is not None:
-                    local_session.close()
-            except Exception:
-                pass
 
 
 ai_service = AiService()

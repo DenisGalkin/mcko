@@ -81,7 +81,7 @@ mcko/
 | `OPENAI_API_URL` | URL OpenAI API | `https://api.openai.com/v1` |
 | `OPENAI_MAX_OUTPUT_TOKENS` | Максимум токенов ответа | `2048` |
 | `OPENAI_MAX_RETRIES` | Количество повторов API-запроса | `2` |
-| `AI_MAX_WORKERS` | Число фоновых AI-потоков | `15` |
+| `AI_MAX_WORKERS` | Число фоновых AI-потоков | `8` |
 | `SQLITE_TIMEOUT_SECONDS` | Таймаут SQLite | `60` |
 | `SQLITE_CACHE_KB` | SQLite cache size | `32768` |
 

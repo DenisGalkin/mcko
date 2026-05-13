@@ -15,6 +15,9 @@ api_bp = Blueprint("api", __name__)
 
 @api_bp.route("/api/tasks", methods=["GET"])
 def api_tasks():
+    gate = admin_required()
+    if gate is not None:
+        return jsonify({"ok": False, "error": "Нужен вход в админку"}), 401
     return jsonify({"ok": True, "tasks": submissions.fetch_submissions()})
 
 

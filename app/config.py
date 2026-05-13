@@ -19,7 +19,7 @@ class Config:
     OPENAI_REASONING_EFFORT = os.getenv("OPENAI_REASONING_EFFORT", "").strip()
     OPENAI_MAX_RETRIES = int(os.getenv("OPENAI_MAX_RETRIES", "2"))
     OPENAI_RETRY_BASE_SECONDS = float(os.getenv("OPENAI_RETRY_BASE_SECONDS", "1.5"))
-    AI_MAX_WORKERS = int(os.getenv("AI_MAX_WORKERS", "15"))
+    AI_MAX_WORKERS = int(os.getenv("AI_MAX_WORKERS", "8"))
     AI_JOB_MAX_ATTEMPTS = int(os.getenv("AI_JOB_MAX_ATTEMPTS", "4"))
     AI_JOB_RETRY_DELAYS_SECONDS = [
         float(value.strip())

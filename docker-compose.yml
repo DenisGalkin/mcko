@@ -6,7 +6,7 @@ services:
       - .env
     environment:
       DATA_DIR: /data
-      AI_MAX_WORKERS: ${AI_MAX_WORKERS:-15}
+      AI_MAX_WORKERS: ${AI_MAX_WORKERS:-8}
       SQLITE_TIMEOUT_SECONDS: ${SQLITE_TIMEOUT_SECONDS:-60}
       SQLITE_CACHE_KB: ${SQLITE_CACHE_KB:-32768}
     volumes:
