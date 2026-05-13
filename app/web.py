@@ -25,7 +25,14 @@ from flask import (
 from . import database
 from . import submission_service
 from .config import Config
-from .settings import DEFAULT_AI_PROMPT, TASK_NUMBERS, UPLOAD_DIR, USER_COOKIE_NAME
+from .settings import (
+    DEFAULT_AI_PROMPT,
+    TASK_CONTENTS,
+    TASK_NUMBERS,
+    UPLOAD_DIR,
+    USER_COOKIE_NAME,
+    task_number_sort_key,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -361,7 +368,7 @@ def answers():
     response = jsonify(
         {
             "ok": True,
-            "answered_tasks": sorted(answered_tasks, key=lambda item: TASK_NUMBERS.index(item)),
+            "answered_tasks": sorted(answered_tasks, key=task_number_sort_key),
             "teacher_answers": teacher_answers,
             "answer_sources": answer_sources,
             "user": current_user,
@@ -576,7 +583,10 @@ def healthz():
 
 @app.context_processor
 def inject_globals():
-    return {"task_numbers_json": json.dumps(TASK_NUMBERS, ensure_ascii=False)}
+    return {
+        "task_numbers_json": json.dumps(TASK_NUMBERS, ensure_ascii=False),
+        "task_contents_json": json.dumps(TASK_CONTENTS, ensure_ascii=False),
+    }
 
 
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)

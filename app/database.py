@@ -508,15 +508,19 @@ def fetch_submissions() -> list[dict]:
                 WHEN '3' THEN 3
                 WHEN '4' THEN 4
                 WHEN '5' THEN 5
-                WHEN '6.1' THEN 6
-                WHEN '6.2' THEN 7
-                WHEN '7' THEN 8
-                WHEN '8' THEN 9
-                WHEN '9' THEN 10
-                WHEN '10' THEN 11
-                WHEN '11' THEN 12
-                WHEN '12' THEN 13
-                WHEN '13' THEN 14
+                WHEN '6' THEN 6
+                WHEN '7' THEN 7
+                WHEN '8' THEN 8
+                WHEN '9' THEN 9
+                WHEN '10' THEN 10
+                WHEN '11' THEN 11
+                WHEN '12' THEN 12
+                WHEN '13' THEN 13
+                WHEN '14' THEN 14
+                WHEN '15' THEN 15
+                WHEN '16' THEN 16
+                WHEN '17' THEN 17
+                ELSE 999
             END,
             s.id DESC
         """

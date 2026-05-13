@@ -177,6 +177,61 @@
             white-space: pre-wrap;
             cursor: pointer;
         }
+        .task-host {
+            min-height: 260px;
+            overflow-wrap: anywhere;
+        }
+        .task-host::after {
+            content: "";
+            display: block;
+            clear: both;
+        }
+        .task-host img {
+            max-width: 100%;
+            height: auto;
+        }
+        .task-host input[type="text"],
+        .task-host input:not([type]) {
+            min-width: 70px;
+            min-height: 28px;
+            border: 1px solid #999;
+            padding: 2px 4px;
+            font-size: 13pt;
+            box-sizing: border-box;
+        }
+        .task-host select {
+            max-width: 100%;
+            min-height: 32px;
+            font-size: 12pt;
+        }
+        .reference-material {
+            float: right;
+            clear: right;
+            margin: 0 0 10px 14px;
+            max-width: min(420px, 46vw);
+            border: 1px solid #d6d6d6;
+            background: #fffef6;
+            padding: 6px 8px;
+        }
+        .reference-material summary {
+            cursor: pointer;
+            font-size: 13px;
+            color: #333399;
+        }
+        .reference-material .zad {
+            margin-top: 8px;
+            max-height: 520px;
+            overflow: auto;
+        }
+        .teacher-answer-row {
+            margin-top: 14px;
+        }
+        .teacher-answer-row[hidden] {
+            display: none;
+        }
+        .teacher-answer-row .answer-textbox {
+            width: min(520px, 100%);
+        }
         .corner-auth {
             position: fixed;
             right: 12px;
@@ -240,6 +295,15 @@
             #content, #QuestionTest, .flash-wrap { width: auto; }
             #content { padding-right: 10px; }
             .corner-auth { width: min(220px, calc(100vw - 20px)); }
+            .task-host img[align="right"],
+            .task-host img[style*="float:right"],
+            .task-host img[style*="float: right"],
+            .reference-material {
+                float: none !important;
+                display: block;
+                max-width: 100%;
+                margin: 8px 0;
+            }
         }
     </style>
 </head>
@@ -257,7 +321,7 @@
         </table>
         <div class="task-buttons">
             <button class="qnum" type="button" id="descriptionBtn">Описание</button>
-            {% set active_task = current_user.current_task or '6.1' %}
+            {% set active_task = current_user.current_task if current_user.current_task in task_numbers else task_numbers[0] %}
             {% for task in task_numbers %}
                 <button class="qnum {% if task == active_task %}qramka selected-task{% endif %} {% if task in answered_tasks %}answered yellow{% endif %}" type="button" data-task="{{ task }}">{{ task }}</button>
             {% endfor %}
@@ -278,33 +342,10 @@
 
 <div id="content">
     <div id="QuestionTest">
-        <img src="{{ url_for('static', filename='images/friction-block.png') }}" width="300" style="float:right; margin-left:20px;">
-        <p class="MsoNormal" id="taskText">
-            На горизонтальной поверхности стола лежит брусок массой <i style="font-family:'Times New Roman', serif; font-size:18pt">m</i> = 2,0 кг
-            (см. рисунок). К бруску приложена горизонтальная сила
-            <span style="position:relative;top:-4.0pt"><img src="{{ url_for('static', filename='images/force-vector.png') }}"></span>
-            под действием которой брусок движется по поверхности стола с ускорением
-            <i style="font-family:'Times New Roman', serif; font-size:18pt">а</i> = 2 м/с<sup>2</sup>.
-            Коэффициент трения между бруском и поверхностью стола
-            <span style="font-family:'Times New Roman', serif; font-size:18pt">μ</span> = 0,4.
-            Ускорение свободного падения <i style="font-family:'Times New Roman', serif; font-size:18pt">g</i> = 10 м/с<sup>2</sup>.
-        </p>
-
-        <p class="qq"><b>А.</b> Из предложенного списка выберите формулу, по которой можно рассчитать модуль силы трения скольжения, действующей на брусок.</p>
-        <table>
-            <tr>
-                <td><label for="r1"><div class="answer"><input type="radio" class="ans" id="r1" name="a0" value="1">&nbsp;<i style="font-family:'Times New Roman', serif; font-size:18pt">mg</i></div></label></td>
-                <td><label for="r2"><div class="answer"><input type="radio" class="ans" id="r2" name="a0" value="2">&nbsp;<span style="font-family:'Times New Roman', serif; font-size:18pt">μ</span><i style="font-family:'Times New Roman', serif; font-size:18pt">mg</i></div></label></td>
-                <td><label for="r3"><div class="answer"><input type="radio" class="ans" id="r3" name="a0" value="3">&nbsp;<i style="font-family:'Times New Roman', serif; font-size:18pt">ma</i></div></label></td>
-                <td><label for="r4"><div class="answer"><input type="radio" class="ans" id="r4" name="a0" value="4">&nbsp;<span style="font-family:'Times New Roman', serif; font-size:18pt">μ</span><i style="font-family:'Times New Roman', serif; font-size:18pt">ma</i></div></label></td>
-            </tr>
-        </table>
-        <br>
-        <p class="qq"><b>Б.</b> Определите модуль силы трения скольжения, действующей на брусок.</p>
-        <div class="answer_flex answer-row" id="answerFrame">
-            <p class="MsoNormal">Ответ:</p>
-            <input id="a1" class="answer-textbox" type="text" placeholder="">
-            <span>Н.</span>
+        <div class="task-host" id="taskHost"></div>
+        <div class="answer_flex answer-row teacher-answer-row" id="teacherAnswerFrame" hidden>
+            <p class="MsoNormal">Ответ проверяющего:</p>
+            <input id="teacherAnswerField" class="answer-textbox" type="text" readonly>
         </div>
 
         <div class="upload-launch" id="AnswerHere">
@@ -371,6 +412,7 @@
 
 <script>
     const taskNumbers = {{ task_numbers_json|safe }};
+    const taskContents = {{ task_contents_json|safe }};
     let teacherAnswers = {{ teacher_answers|tojson }};
     let answerSources = {{ answer_sources|tojson }};
     let answeredTasks = new Set({{ answered_tasks|list|tojson }});
@@ -385,9 +427,9 @@
     const submitButton = document.getElementById("submitButton");
     const fileList = document.getElementById("fileList");
     const uploadForm = document.getElementById("uploadForm");
-    const taskText = document.getElementById("taskText");
-    const answerField = document.getElementById("a1");
-    const answerFrame = document.getElementById("answerFrame");
+    const taskHost = document.getElementById("taskHost");
+    const teacherAnswerFrame = document.getElementById("teacherAnswerFrame");
+    const teacherAnswerField = document.getElementById("teacherAnswerField");
     const toast = document.getElementById("toast");
     const descriptionBtn = document.getElementById("descriptionBtn");
     const finishBtn = document.getElementById("finishBtn");
@@ -419,7 +461,7 @@
         nickname: currentUser.nickname || ""
     });
     let answerViewTask = "";
-    const originalTaskTextHtml = taskText.innerHTML;
+    let selectedTask = "";
 
     function showToast(message) {
         toast.textContent = message;
@@ -548,11 +590,32 @@
         });
     }
 
+    function renderTaskContent(task) {
+        taskHost.classList.remove("task-text-swapped");
+        taskHost.title = "";
+        taskHost.innerHTML = taskContents[task] || '<p class="compact-muted">Текст задания не найден.</p>';
+        syncTeacherAnswer(task);
+    }
+
+    function findRenderedAnswerField() {
+        const controls = Array.from(taskHost.querySelectorAll('input[type="text"], input:not([type]), textarea'));
+        return controls.find((control) => !control.closest(".reference-material")) || null;
+    }
+
+    function syncTeacherAnswer(task) {
+        const answer = String(teacherAnswers[task] || "").trim();
+        teacherAnswerField.value = answer;
+        teacherAnswerFrame.hidden = !answer;
+
+        const renderedAnswerField = findRenderedAnswerField();
+        if (renderedAnswerField) {
+            renderedAnswerField.value = answer;
+        }
+    }
+
     function hideTeacherAnswer() {
         answerViewTask = "";
-        taskText.classList.remove("task-text-swapped");
-        taskText.innerHTML = originalTaskTextHtml;
-        taskText.title = "";
+        renderTaskContent(selectedTask || taskNumbers[0]);
     }
 
     function showTeacherAnswer(task) {
@@ -562,9 +625,10 @@
             return false;
         }
         answerViewTask = task;
-        taskText.classList.add("task-text-swapped");
-        taskText.textContent = answer;
-        taskText.title = "Нажмите, чтобы вернуть текст задания";
+        taskHost.classList.add("task-text-swapped");
+        taskHost.textContent = answer;
+        taskHost.title = "Нажмите, чтобы вернуть текст задания";
+        syncTeacherAnswer(task);
         return true;
     }
 
@@ -574,12 +638,14 @@
         if (!button) {
             return false;
         }
-        hideTeacherAnswer();
+        answerViewTask = "";
+        selectedTask = task;
+        renderTaskContent(task);
         document.querySelectorAll(".qnum[data-task]").forEach((item) => {
             item.classList.remove("selected-task", "qramka");
         });
         button.classList.add("selected-task", "qramka");
-        answerField.value = teacherAnswers[task] || "";
+        taskNumberSelect.value = task;
         saveCurrentTask(task);
         return true;
     }
@@ -714,11 +780,8 @@
                 } else {
                     hideTeacherAnswer();
                 }
-            }
-            const activeTaskButton = document.querySelector(".qnum[data-task].selected-task");
-            if (activeTaskButton) {
-                const task = activeTaskButton.dataset.task;
-                answerField.value = teacherAnswers[task] || "";
+            } else if (selectedTask) {
+                syncTeacherAnswer(selectedTask);
             }
         } catch (error) {
             console.error(error);
@@ -757,7 +820,7 @@
     }
 
     openUploadPanel.addEventListener("click", () => {
-        taskNumberSelect.value = "";
+        taskNumberSelect.value = selectedTask || "";
         uploadPanel.classList.add("open");
         textContent.focus();
     });
@@ -798,8 +861,8 @@
     closeCompactPanel.addEventListener("click", () => {
         compactPanel.classList.remove("open");
     });
-    answerFrame.addEventListener("pointerdown", closeExtraWindows);
-    taskText.addEventListener("click", () => {
+    taskHost.addEventListener("pointerdown", closeExtraWindows);
+    taskHost.addEventListener("click", () => {
         if (answerViewTask) {
             hideTeacherAnswer();
         }
@@ -829,7 +892,7 @@
             target instanceof HTMLTextAreaElement ||
             target instanceof HTMLSelectElement ||
             target.isContentEditable;
-        if (isFormField && target !== answerField) {
+        if (isFormField) {
             return;
         }
         event.preventDefault();
@@ -944,8 +1007,8 @@
     });
 
     renderFiles();
-    taskNumberSelect.value = "";
     refreshTaskButtons();
+    selectTask(currentUser.current_task && hasTask(currentUser.current_task) ? currentUser.current_task : taskNumbers[0]);
     startCountdownTimer();
     document.addEventListener("visibilitychange", () => {
         if (document.visibilityState === "visible") {
