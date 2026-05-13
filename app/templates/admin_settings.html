@@ -14,8 +14,8 @@
                 <div class="muted">Отдельный экран для AI и служебных параметров.</div>
             </div>
             <div class="settings_actions">
-                <a href="{{ url_for('admin') }}">К заданиям</a>
-                <form method="post" action="{{ url_for('admin_logout') }}">
+                <a href="{{ url_for('admin.admin') }}">К заданиям</a>
+                <form method="post" action="{{ url_for('admin.admin_logout') }}">
                     <button type="submit" class="ghost">Выйти</button>
                 </form>
             </div>

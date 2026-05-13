@@ -35,12 +35,17 @@ docker compose up -d
 ```text
 mcko/
 ├── app/
-│   ├── __init__.py
-│   ├── web.py                    # Flask routes, AI orchestration, app entrypoint
+│   ├── __init__.py               # Application factory and blueprint registration
+│   ├── web.py                    # Compatibility app entrypoint
 │   ├── config.py                 # Environment-based config
 │   ├── settings.py               # Paths, task numbers, shared constants
-│   ├── database.py               # SQLAlchemy schema and queries
-│   ├── submission_service.py     # Upload and submission workflow helpers
+│   ├── database.py               # Compatibility facade for repositories
+│   ├── db/                       # SQLAlchemy engine, sessions, schema and init
+│   ├── repositories/             # Query groups by domain
+│   ├── routes/                   # Flask blueprints by app area
+│   ├── services/                 # Business logic and external integrations
+│   ├── models.py                 # Typed DTO/dataclass models
+│   ├── submission_service.py     # Compatibility facade for submission service
 │   ├── templates/
 │   │   ├── student_exam.html
 │   │   ├── admin_dashboard.html

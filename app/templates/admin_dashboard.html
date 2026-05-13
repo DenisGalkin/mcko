@@ -28,7 +28,7 @@
                     </div>
                     <div class="admin_nav_links">
                         <a class="admin_back" href="/">Основной сайт</a>
-                        <a class="admin_back" href="{{ url_for('admin_settings') }}">Настройки</a>
+                        <a class="admin_back" href="{{ url_for('admin.admin_settings') }}">Настройки</a>
                     </div>
                 </div>
 
@@ -87,7 +87,7 @@
                     </div>
                     <div class="admin_toolbar_right">
                         <button type="button" id="refreshTasksBtn">Обновить</button>
-                        <form method="post" action="{{ url_for('admin_logout') }}">
+                        <form method="post" action="{{ url_for('admin.admin_logout') }}">
                             <button type="submit" class="admin_ghost_btn">Выйти</button>
                         </form>
                     </div>
