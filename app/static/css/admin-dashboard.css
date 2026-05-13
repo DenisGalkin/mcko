@@ -102,8 +102,9 @@ body {
 }
 
 .admin_body #saveAnswerBtnAdmin,
-.admin_settings_body #addAiBtn,
+.admin_settings_body #addSpecialLoginBtn,
 .admin_settings_body #saveAiSettingsBtn,
+.admin_settings_body #saveUploadSettingsBtn,
 .admin_login_body .login_card button {
     border-color: var(--admin-primary-dark);
     background: var(--admin-primary);
@@ -111,8 +112,9 @@ body {
 }
 
 .admin_body #saveAnswerBtnAdmin:hover,
-.admin_settings_body #addAiBtn:hover,
+.admin_settings_body #addSpecialLoginBtn:hover,
 .admin_settings_body #saveAiSettingsBtn:hover,
+.admin_settings_body #saveUploadSettingsBtn:hover,
 .admin_login_body .login_card button:hover {
     background: var(--admin-primary-dark);
     color: #ffffff;
@@ -278,7 +280,7 @@ body {
 
 .admin_filter_row {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 8px;
 }
 
@@ -373,6 +375,13 @@ body {
     border-color: #b9dfca;
     background: #edf9f2;
     color: var(--admin-success);
+}
+
+.admin_task_item.is-processing .admin_task_badge,
+.admin_status_chip.is-processing {
+    border-color: #e7c26f;
+    background: var(--admin-warning-bg);
+    color: #8a5b00;
 }
 
 .admin_task_name {
@@ -513,6 +522,25 @@ body {
     border-color: #b9dfca;
     background: #edf9f2;
     color: var(--admin-success);
+}
+
+.admin_work_toggle {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+.admin_work_toggle span {
+    font-size: 16px;
+    font-weight: 800;
+}
+
+.admin_work_toggle input {
+    flex: 0 0 auto;
+    width: 22px;
+    height: 22px;
+    padding: 0;
 }
 
 .admin_tag {
@@ -702,6 +730,10 @@ body {
     gap: 18px;
 }
 
+.settings_card_wide {
+    grid-column: 1 / -1;
+}
+
 .settings_card,
 .login_card {
     border: 1px solid var(--admin-border);
@@ -788,6 +820,39 @@ body {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
+}
+
+.special_login_table_wrap {
+    overflow-x: auto;
+}
+
+.special_login_table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.special_login_table th,
+.special_login_table td {
+    border-bottom: 1px solid var(--admin-border);
+    padding: 10px 8px;
+    text-align: left;
+    vertical-align: middle;
+    font-size: 14px;
+}
+
+.special_login_table th {
+    color: var(--admin-muted);
+    font-weight: 800;
+}
+
+.special_login_table input[type="checkbox"] {
+    width: 22px;
+    height: 22px;
+    padding: 0;
+}
+
+.special_login_table input[type="number"] {
+    width: 110px;
 }
 
 .chip {

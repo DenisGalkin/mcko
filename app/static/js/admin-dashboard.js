@@ -17,6 +17,7 @@ const adminPreviewWrap = document.getElementById("adminPreviewWrap");
 const adminFileMeta = document.getElementById("adminFileMeta");
 const adminTaskTextBlock = document.getElementById("adminTaskTextBlock");
 const adminAnswerText = document.getElementById("adminAnswerText");
+const adminInProgressToggle = document.getElementById("adminInProgressToggle");
 const adminFlash = document.getElementById("adminFlash");
 const prevTaskBtn = document.getElementById("prevTaskBtn");
 const nextTaskBtn = document.getElementById("nextTaskBtn");
@@ -66,24 +67,22 @@ function normalizeTasks(tasks) {
       file_url: task.file_url || "",
       created: task.created || task.created_at || "",
       answer_source: task.answer_source || "",
+      task_priority: Number(task.task_priority || 0),
+      visible_status: task.visible_status || getVisibleStatus(task),
+      tags: Array.isArray(task.tags) ? task.tags : [],
+      ai_processing: Boolean(task.ai_processing),
+      admin_processing: Boolean(task.admin_processing),
+      admin_processing_by: String(task.admin_processing_by || ""),
     }))
     .sort(compareAdminTasks);
 }
 
 function compareAdminTasks(a, b) {
-  const statusDiff = getSortStatusRank(a) - getSortStatusRank(b);
-  if (statusDiff !== 0) return statusDiff;
-  const userDiff = Number(a.user_id || 0) - Number(b.user_id || 0);
-  if (userDiff !== 0) return userDiff;
+  const priorityDiff = Number(b.task_priority || 0) - Number(a.task_priority || 0);
+  if (priorityDiff !== 0) return priorityDiff;
   return String(a.task_number || "").localeCompare(String(b.task_number || ""), undefined, {
     numeric: true,
   });
-}
-
-function getSortStatusRank(task) {
-  if (!String(task.answer_text || "").trim()) return 0;
-  if (task.answer_source === "ai") return 1;
-  return 2;
 }
 
 function buildTasksSnapshot(tasks) {
@@ -99,6 +98,12 @@ function buildTasksSnapshot(tasks) {
       String(task.created || ""),
       String(task.answer_text || ""),
       String(task.answer_source || ""),
+      Number(task.task_priority || 0),
+      String(task.visible_status || ""),
+      (task.tags || []).join("|"),
+      Boolean(task.admin_processing),
+      Boolean(task.ai_processing),
+      String(task.admin_processing_by || ""),
     ]),
   );
 }
@@ -109,16 +114,15 @@ function getUserLabel(task) {
 }
 
 function getAnswerStatusLabel(task) {
-  const hasAnswer = Boolean(String(task.answer_text || "").trim());
-  if (!hasAnswer) return "Без ответа";
-  return task.answer_source === "ai" ? "Решено нейросетью" : "Задание уже решено";
+  return getVisibleStatus(task);
 }
 
-function getAnswerSourceTag(task) {
-  if (!String(task.answer_text || "").trim()) return "";
-  if (task.answer_source === "ai") return "Решено AI";
-  if (task.answer_source === "admin") return "Ответ администратора";
-  return "Есть ответ";
+function getVisibleStatus(task) {
+  if (String(task.admin_answer || "").trim() || String(task.ai_answer || "").trim() || String(task.answer_text || "").trim()) {
+    return "с ответом";
+  }
+  if (task.ai_processing || task.admin_processing) return "в обработке";
+  return "без ответа";
 }
 
 function isTaskUserAiAllowed(task) {
@@ -129,8 +133,9 @@ function isTaskUserAiAllowed(task) {
 function getFilteredTasks() {
   return state.tasks.filter((task) => {
     const answer = task.answer_text.trim();
-    if (state.filter === "open" && answer) return false;
-    if (state.filter === "solved" && !answer) return false;
+    if (state.filter === "open" && getVisibleStatus(task) !== "без ответа") return false;
+    if (state.filter === "processing" && getVisibleStatus(task) !== "в обработке") return false;
+    if (state.filter === "solved" && getVisibleStatus(task) !== "с ответом") return false;
     if (state.userFilter && String(task.user_id) !== state.userFilter) return false;
 
     if (!state.query) return true;
@@ -151,7 +156,7 @@ function getFilteredTasks() {
 function renderStats() {
   statTotal.textContent = state.tasks.length;
   statSolved.textContent = state.tasks.filter((task) => task.answer_text.trim()).length;
-  statOpen.textContent = state.tasks.filter((task) => !task.answer_text.trim()).length;
+  statOpen.textContent = state.tasks.filter((task) => getVisibleStatus(task) === "без ответа").length;
 }
 
 function renderUserFilter() {
@@ -191,16 +196,18 @@ function renderTaskList() {
     item.className = "admin_task_item";
     if (task.task_key === state.selectedTaskKey) item.classList.add("active");
     if (task.answer_text.trim()) item.classList.add("is-solved");
+    if (getVisibleStatus(task) === "в обработке") item.classList.add("is-processing");
     const preview = String(task.task_text || "").trim();
     const shortPreview = preview.length > 96 ? `${preview.slice(0, 96)}...` : preview;
     item.innerHTML = `
       <span class="admin_task_top">
         <span class="admin_task_num">№${escapeHtml(task.task_number)} · ${escapeHtml(getUserLabel(task))}</span>
-        <span class="admin_task_badge">${escapeHtml(task.answer_text.trim() ? "Готово" : "Нужно ответить")}</span>
+        <span class="admin_task_badge">${escapeHtml(getVisibleStatus(task))}</span>
       </span>
       <span class="admin_task_name">${escapeHtml(shortPreview || (task.filename ? task.filename : "Без текста и файла"))}</span>
       <span class="admin_task_state">
-        <span>${escapeHtml(task.user_current_task ? `Сейчас: №${task.user_current_task}` : getAnswerStatusLabel(task))}</span>
+        <span>${escapeHtml(task.user_current_task ? `Сейчас: №${task.user_current_task}` : getVisibleStatus(task))}</span>
+        <span>Приоритет: ${escapeHtml(task.task_priority)}</span>
         <span>${task.filename ? "Файл приложен" : "Файл не приложен"}</span>
       </span>
     `;
@@ -230,8 +237,12 @@ function renderHeadingTags(task) {
     tags.push('<span class="admin_tag is-active">Есть текст</span>');
   }
   if ((task.answer_text || "").trim()) {
-    tags.push(`<span class="admin_tag is-active">${escapeHtml(getAnswerSourceTag(task))}</span>`);
+    tags.push(`<span class="admin_tag is-active">${escapeHtml(getVisibleStatus(task))}</span>`);
   }
+  (task.tags || []).forEach((tag) => {
+    tags.push(`<span class="admin_tag is-active">${escapeHtml(tag)}</span>`);
+  });
+  tags.push(`<span class="admin_tag">Приоритет: ${escapeHtml(task.task_priority)}</span>`);
   tags.push(`<span class="admin_tag ${isTaskUserAiAllowed(task) ? "is-active" : ""}">${isTaskUserAiAllowed(task) ? "AI разрешен" : "AI запрещен"}</span>`);
   adminHeadingTags.innerHTML = tags.join("");
 }
@@ -276,7 +287,10 @@ function renderEditor(task) {
   adminTaskCreated.textContent = task.created ? `Создано: ${task.created}` : "";
   adminTaskStatus.textContent = getAnswerStatusLabel(task);
   adminTaskStatus.classList.toggle("is-solved", Boolean(task.answer_text.trim()));
+  adminTaskStatus.classList.toggle("is-processing", getVisibleStatus(task) === "в обработке");
   adminAnswerText.value = task.answer_text || "";
+  adminInProgressToggle.checked = Boolean(task.admin_processing);
+  adminInProgressToggle.disabled = Boolean(String(task.admin_answer || "").trim());
   if (adminTaskTextBlock) {
     const taskText = String(task.task_text || "").trim();
     adminTaskTextBlock.hidden = !taskText;
@@ -460,6 +474,9 @@ saveAnswerBtnAdmin.addEventListener("click", () =>
 clearAnswerBtn.addEventListener("click", () => {
   adminAnswerText.value = "";
   saveCurrentTask({ answer_text: "" });
+});
+adminInProgressToggle.addEventListener("change", () => {
+  saveCurrentTask({ admin_in_progress: adminInProgressToggle.checked });
 });
 mobileListBtn.addEventListener("click", () => {
   state.mobilePane = "list";

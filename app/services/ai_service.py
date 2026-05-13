@@ -155,6 +155,10 @@ class AiJobRunner:
                 if submission_id in self.pending_ids:
                     continue
                 self.pending_ids.add(submission_id)
+            if submissions.set_submission_ai_processing(submission_id, True) == 0:
+                with self.pending_lock:
+                    self.pending_ids.discard(submission_id)
+                continue
             self.executor.submit(self.run_auto_generation, submission_id)
             queued += 1
         return queued
@@ -198,6 +202,15 @@ class AiJobRunner:
                             submission_id,
                             attempt + 1,
                         )
+                        write_session = db_session.create_session()
+                        try:
+                            submissions.set_submission_ai_processing(submission_id, False, write_session)
+                            write_session.commit()
+                        except Exception:
+                            write_session.rollback()
+                            logger.exception("Failed to clear AI processing state for submission %s", submission_id)
+                        finally:
+                            write_session.close()
                         return
                     logger.warning(
                         "AI generation attempt %s/%s failed for submission %s: %s",

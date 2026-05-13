@@ -11,6 +11,11 @@ class AiSettings:
     prompt: str
 
 
+@dataclass(frozen=True)
+class UploadSettings:
+    require_login: bool
+
+
 class User(TypedDict, total=False):
     id: int
     uid: str
@@ -35,6 +40,12 @@ class Submission(TypedDict, total=False):
     text_content: str
     admin_answer: str
     ai_answer: str
+    task_priority: int
+    visible_status: str
+    tags: list[str]
+    ai_processing_at: str | None
+    admin_processing_by: str
+    admin_processing_at: str | None
     created_at: str
     updated_at: str
     answered_at: str | None

@@ -31,6 +31,10 @@ submissions = Table(
     Column("text_content", Text, nullable=False, server_default=""),
     Column("admin_answer", Text, nullable=False, server_default=""),
     Column("ai_answer", Text, nullable=False, server_default=""),
+    Column("task_priority", Integer, nullable=False, server_default="0"),
+    Column("ai_processing_at", Text),
+    Column("admin_processing_by", Text, nullable=False, server_default=""),
+    Column("admin_processing_at", Text),
     Column("created_at", Text, nullable=False),
     Column("updated_at", Text, nullable=False),
     Column("answered_at", Text),
@@ -50,7 +54,10 @@ ai_allowed_nicknames = Table(
     "ai_allowed_nicknames",
     metadata,
     Column("nickname", Text, primary_key=True),
+    Column("ai_enabled", Integer, nullable=False, server_default="1"),
+    Column("karma", Integer, nullable=False, server_default="100"),
     Column("created_at", Text, nullable=False),
+    Column("updated_at", Text),
 )
 
 app_settings = Table(
@@ -64,6 +71,7 @@ app_settings = Table(
 Index("idx_submissions_user_task_id", submissions.c.user_id, submissions.c.task_number, submissions.c.id.desc())
 Index("idx_submissions_user_answer", submissions.c.user_id, submissions.c.admin_answer, submissions.c.ai_answer)
 Index("idx_submissions_user_id_desc", submissions.c.user_id, submissions.c.id.desc())
+Index("idx_submissions_priority", submissions.c.task_priority.desc(), submissions.c.id)
 Index("idx_submission_files_submission", submission_files.c.submission_id, submission_files.c.id)
 Index("idx_users_nickname_nocase", users.c.nickname.collate("NOCASE"))
 Index("idx_ai_allowed_nickname_nocase", ai_allowed_nicknames.c.nickname.collate("NOCASE"))
@@ -96,6 +104,10 @@ def ensure_indexes() -> None:
         ON submissions (user_id, id DESC)
         """,
         """
+        CREATE INDEX IF NOT EXISTS idx_submissions_priority
+        ON submissions (task_priority DESC, id)
+        """,
+        """
         CREATE INDEX IF NOT EXISTS idx_submission_files_submission
         ON submission_files (submission_id, id)
         """,
@@ -118,7 +130,14 @@ def init_db() -> None:
     ensure_column("submissions", "user_id", "INTEGER NOT NULL DEFAULT 0")
     ensure_column("submissions", "ai_answer", "TEXT NOT NULL DEFAULT ''")
     ensure_column("submissions", "ai_generated_at", "TEXT")
+    ensure_column("submissions", "task_priority", "INTEGER NOT NULL DEFAULT 0")
+    ensure_column("submissions", "ai_processing_at", "TEXT")
+    ensure_column("submissions", "admin_processing_by", "TEXT NOT NULL DEFAULT ''")
+    ensure_column("submissions", "admin_processing_at", "TEXT")
     ensure_column("users", "current_task", "TEXT NOT NULL DEFAULT ''")
+    ensure_column("ai_allowed_nicknames", "ai_enabled", "INTEGER NOT NULL DEFAULT 1")
+    ensure_column("ai_allowed_nicknames", "karma", "INTEGER NOT NULL DEFAULT 100")
+    ensure_column("ai_allowed_nicknames", "updated_at", "TEXT")
     ensure_indexes()
 
     timestamp = current_timestamp()
@@ -128,6 +147,7 @@ def init_db() -> None:
             "ai_enabled": "1" if Config.AI_ENABLED else "0",
             "openai_model": Config.OPENAI_MODEL,
             "ai_prompt": DEFAULT_AI_PROMPT,
+            "require_login_for_upload": "0",
         }
         for key, value in default_settings.items():
             connection.execute(

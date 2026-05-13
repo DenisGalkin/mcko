@@ -3,7 +3,7 @@ from __future__ import annotations
 from flask import Blueprint, jsonify, make_response, render_template, request
 
 from ..config import Config
-from ..repositories import settings, submissions
+from ..repositories import ai_allowed, settings, submissions
 from ..services.ai_service import ai_job_runner
 from ..services.submission_service import submission_service
 from ..services.text import normalize_text
@@ -66,6 +66,11 @@ def save_current_task():
 @student_bp.route("/submit", methods=["POST"])
 def submit():
     current_user, is_new_user = user_service.get_or_create_current_user()
+    nickname = normalize_text(current_user.get("nickname", ""))
+    if settings.get_upload_settings().require_login and not ai_allowed.is_special_login(nickname):
+        response = jsonify({"ok": False, "error": "Для загрузки задания укажите логин из списка специальных логинов."})
+        return with_cookie_if_needed(response, is_new_user, current_user["uid"]), 403
+
     text_content = normalize_text(request.form.get("text_content", ""))
     selected_task = request.form.get("task_number") or None
     uploaded_files = [file for file in request.files.getlist("files") if file and file.filename]

@@ -6,8 +6,10 @@ from sqlalchemy.orm import Session
 from ..config import Config
 from ..db import session as db_session
 from ..db.schema import app_settings, current_timestamp
-from ..models import AiSettings
+from ..models import AiSettings, UploadSettings
 from ..settings import DEFAULT_AI_PROMPT
+
+
 def fetch_app_settings(session: Session | None = None) -> dict[str, str]:
     rows = (session or db_session.get_session()).execute(select(app_settings.c.key, app_settings.c.value)).mappings().all()
     return {row["key"]: row["value"] for row in rows}
@@ -24,6 +26,17 @@ def get_ai_settings(session: Session | None = None) -> AiSettings:
     model = str(settings.get("openai_model", Config.OPENAI_MODEL) or "").strip() or Config.OPENAI_MODEL
     prompt = str(settings.get("ai_prompt", DEFAULT_AI_PROMPT) or "").strip() or DEFAULT_AI_PROMPT
     return AiSettings(enabled=enabled, model=model, prompt=prompt)
+
+
+def get_upload_settings(session: Session | None = None) -> UploadSettings:
+    app_settings = fetch_app_settings(session)
+    require_login = str(app_settings.get("require_login_for_upload", "0")).strip().lower() in {
+        "1",
+        "true",
+        "on",
+        "yes",
+    }
+    return UploadSettings(require_login=require_login)
 
 
 def update_app_settings(values: dict[str, str]) -> None:

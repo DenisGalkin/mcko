@@ -24,25 +24,39 @@
         <div class="settings_flash" id="flash"></div>
 
         <div class="settings_grid">
-            <section class="settings_card">
-                <h2>AI доступ по никам</h2>
+            <section class="settings_card settings_card_wide">
+                <h2>Специальные логины</h2>
                 <div class="settings_row">
-                    <input type="text" id="aiNicknameInput" placeholder="Введите никнейм">
-                    <button type="button" id="addAiBtn">Добавить</button>
+                    <input type="text" id="specialLoginInput" placeholder="Введите логин">
+                    <button type="button" id="addSpecialLoginBtn">Добавить</button>
                 </div>
-                <div class="chips" id="aiList">
-                    {% for nickname in ai_allowed_nicknames %}
-                        <div class="chip" data-nickname="{{ nickname }}">
-                            <span>{{ nickname }}</span>
-                            <button type="button" data-remove="{{ nickname }}">Удалить</button>
-                        </div>
-                    {% else %}
-                        <div class="muted" id="emptyHint">Список пока пуст.</div>
-                    {% endfor %}
+                <div class="special_login_table_wrap">
+                    <table class="special_login_table" id="specialLoginTable">
+                        <thead>
+                            <tr>
+                                <th>Логин</th>
+                                <th>Доступ к AI</th>
+                                <th>Карма</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="specialLoginRows"></tbody>
+                    </table>
                 </div>
             </section>
 
             <section class="settings_card">
+                <h2>Загрузка заданий</h2>
+                <div class="settings-form">
+                    <label class="switch-row">
+                        <span>Запретить загрузку без логина</span>
+                        <input type="checkbox" id="requireLoginUploadInput" {% if config_view.REQUIRE_LOGIN_FOR_UPLOAD %}checked{% endif %}>
+                    </label>
+                    <button type="button" id="saveUploadSettingsBtn">Сохранить настройку загрузки</button>
+                </div>
+            </section>
+
+            <section class="settings_card settings_card_wide">
                 <h2>AI настройки</h2>
                 <div class="settings-form">
                     <label class="switch-row">
@@ -76,9 +90,12 @@
     </div>
 
     <script>
-        const aiList = document.getElementById("aiList");
-        const aiNicknameInput = document.getElementById("aiNicknameInput");
-        const addAiBtn = document.getElementById("addAiBtn");
+        let specialLogins = {{ special_logins|tojson }};
+        const specialLoginRows = document.getElementById("specialLoginRows");
+        const specialLoginInput = document.getElementById("specialLoginInput");
+        const addSpecialLoginBtn = document.getElementById("addSpecialLoginBtn");
+        const requireLoginUploadInput = document.getElementById("requireLoginUploadInput");
+        const saveUploadSettingsBtn = document.getElementById("saveUploadSettingsBtn");
         const aiEnabledInput = document.getElementById("aiEnabledInput");
         const aiModelInput = document.getElementById("aiModelInput");
         const aiPromptInput = document.getElementById("aiPromptInput");
@@ -91,53 +108,107 @@
             flash.style.display = "block";
         }
 
-        function rebuildNicknames(nicknames) {
-            aiList.innerHTML = "";
-            if (!nicknames.length) {
-                aiList.innerHTML = '<div class="muted" id="emptyHint">Список пока пуст.</div>';
+        function escapeHtml(value) {
+            return String(value)
+                .replaceAll("&", "&amp;")
+                .replaceAll("<", "&lt;")
+                .replaceAll(">", "&gt;")
+                .replaceAll('"', "&quot;")
+                .replaceAll("'", "&#39;");
+        }
+
+        function rebuildSpecialLogins(items) {
+            specialLogins = items || [];
+            specialLoginRows.innerHTML = "";
+            if (!specialLogins.length) {
+                specialLoginRows.innerHTML = '<tr><td colspan="4" class="muted">Список пока пуст.</td></tr>';
                 return;
             }
-            nicknames.forEach((nickname) => {
-                const chip = document.createElement("div");
-                chip.className = "chip";
-                chip.dataset.nickname = nickname;
-                chip.innerHTML = `<span>${nickname}</span><button type="button" data-remove="${nickname}">Удалить</button>`;
-                aiList.appendChild(chip);
+            specialLogins.forEach((item) => {
+                const row = document.createElement("tr");
+                row.dataset.nickname = item.nickname;
+                row.innerHTML = `
+                    <td>${escapeHtml(item.nickname)}</td>
+                    <td><input type="checkbox" data-ai-enabled ${item.ai_enabled ? "checked" : ""}></td>
+                    <td><input type="number" data-karma value="${Number(item.karma || 100)}" step="1"></td>
+                    <td><button type="button" class="ghost" data-remove="${escapeHtml(item.nickname)}">Удалить</button></td>
+                `;
+                specialLoginRows.appendChild(row);
             });
         }
 
-        addAiBtn.addEventListener("click", async () => {
-            const nickname = aiNicknameInput.value.trim();
-            if (!nickname) return;
-            const response = await fetch("/api/ai-allowed", {
-                method: "POST",
+        async function saveSpecialLoginRow(row) {
+            const nickname = row.dataset.nickname;
+            const response = await fetch(`/api/special-logins/${encodeURIComponent(nickname)}`, {
+                method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ nickname })
+                body: JSON.stringify({
+                    ai_enabled: row.querySelector("[data-ai-enabled]").checked,
+                    karma: row.querySelector("[data-karma]").value
+                })
             });
             const data = await response.json();
             if (!response.ok || !data.ok) {
-                showFlash(data.error || "Не удалось добавить ник", true);
+                showFlash(data.error || "Не удалось сохранить логин", true);
+                rebuildSpecialLogins(specialLogins);
                 return;
             }
-            aiNicknameInput.value = "";
-            rebuildNicknames(data.nicknames || []);
-            showFlash("Ник добавлен.");
+            rebuildSpecialLogins(data.special_logins || []);
+            showFlash("Логин сохранен.");
+        }
+
+        addSpecialLoginBtn.addEventListener("click", async () => {
+            const nickname = specialLoginInput.value.trim();
+            if (!nickname) return;
+            const response = await fetch("/api/special-logins", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ nickname, ai_enabled: true, karma: 100 })
+            });
+            const data = await response.json();
+            if (!response.ok || !data.ok) {
+                showFlash(data.error || "Не удалось добавить логин", true);
+                return;
+            }
+            specialLoginInput.value = "";
+            rebuildSpecialLogins(data.special_logins || []);
+            showFlash("Логин добавлен.");
         });
 
-        aiList.addEventListener("click", async (event) => {
+        specialLoginRows.addEventListener("change", (event) => {
+            const target = event.target;
+            if (!target.matches("[data-ai-enabled], [data-karma]")) return;
+            saveSpecialLoginRow(target.closest("tr"));
+        });
+
+        specialLoginRows.addEventListener("click", async (event) => {
             const button = event.target.closest("button[data-remove]");
             if (!button) return;
             const nickname = button.dataset.remove;
-            const response = await fetch(`/api/ai-allowed/${encodeURIComponent(nickname)}`, {
+            const response = await fetch(`/api/special-logins/${encodeURIComponent(nickname)}`, {
                 method: "DELETE"
             });
             const data = await response.json();
             if (!response.ok || !data.ok) {
-                showFlash(data.error || "Не удалось удалить ник", true);
+                showFlash(data.error || "Не удалось удалить логин", true);
                 return;
             }
-            rebuildNicknames(data.nicknames || []);
-            showFlash("Ник удален.");
+            rebuildSpecialLogins(data.special_logins || []);
+            showFlash("Логин удален.");
+        });
+
+        saveUploadSettingsBtn.addEventListener("click", async () => {
+            const response = await fetch("/api/admin/settings/uploads", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ require_login: requireLoginUploadInput.checked })
+            });
+            const data = await response.json();
+            if (!response.ok || !data.ok) {
+                showFlash(data.error || "Не удалось сохранить настройку загрузки", true);
+                return;
+            }
+            showFlash("Настройка загрузки сохранена.");
         });
 
         saveAiSettingsBtn.addEventListener("click", async () => {
@@ -167,6 +238,8 @@
             }
             showFlash("AI настройки сохранены.");
         });
+
+        rebuildSpecialLogins(specialLogins);
     </script>
 </body>
 </html>

@@ -7,7 +7,7 @@ from ..db import session as db_session
 from ..repositories import ai_allowed, settings, submissions
 from ..services.ai_service import ai_service
 from ..services.text import normalize_text
-from .auth import admin_required
+from .auth import admin_required, get_admin_worker_id
 
 
 admin_bp = Blueprint("admin", __name__)
@@ -23,6 +23,7 @@ def admin():
         "admin_dashboard.html",
         submissions=submissions.fetch_submissions(),
         ai_allowed_nicknames=ai_allowed.fetch_allowed_nicknames(),
+        admin_worker_id=get_admin_worker_id(),
         ai_enabled=bool(ai_settings.enabled and Config.OPENAI_API_KEY),
     )
 
@@ -35,6 +36,7 @@ def admin_login():
         password = normalize_text(request.form.get("password", ""))
         if password == Config.ADMIN_PASSWORD:
             session["admin_authenticated"] = True
+            get_admin_worker_id()
             return redirect(next_url)
         error = "Неверный пароль"
     return render_template("admin_login.html", error=error, next_url=next_url)
@@ -43,6 +45,7 @@ def admin_login():
 @admin_bp.route("/admin/logout", methods=["POST"])
 def admin_logout():
     session.pop("admin_authenticated", None)
+    session.pop("admin_worker_id", None)
     return redirect(url_for("admin.admin_login"))
 
 
@@ -54,11 +57,12 @@ def admin_settings():
     ai_settings = settings.get_ai_settings()
     return render_template(
         "admin_settings.html",
-        ai_allowed_nicknames=ai_allowed.fetch_allowed_nicknames(),
+        special_logins=ai_allowed.fetch_special_logins(),
         config_view={
             "AI_ENABLED": ai_settings.enabled,
             "OPENAI_MODEL": ai_settings.model,
             "AI_PROMPT": ai_settings.prompt,
+            "REQUIRE_LOGIN_FOR_UPLOAD": settings.get_upload_settings().require_login,
             "OPENAI_API_URL": Config.OPENAI_API_URL,
             "OPENAI_API_KEY_SET": bool(Config.OPENAI_API_KEY),
             "ADMIN_PASSWORD_SET": bool(Config.ADMIN_PASSWORD),

@@ -69,6 +69,9 @@
                         <button type="button" class="admin_filter_btn" data-filter="open">
                             Без ответа
                         </button>
+                        <button type="button" class="admin_filter_btn" data-filter="processing">
+                            В обработке
+                        </button>
                         <button type="button" class="admin_filter_btn" data-filter="solved">
                             С ответом
                         </button>
@@ -126,6 +129,13 @@
                     </div>
 
                     <div class="admin_card">
+                        <label class="admin_work_toggle">
+                            <span>Задание взято в работу админом</span>
+                            <input type="checkbox" id="adminInProgressToggle">
+                        </label>
+                    </div>
+
+                    <div class="admin_card">
                         <div class="admin_card_title">
                             <span>Ответ</span>
                             <span class="admin_card_hint">Сохраняется для выбранного задания</span>
@@ -147,6 +157,7 @@
         <script>
             window.adminInitialTasks = {{ submissions|tojson }};
             window.adminInitialAiAllowed = {{ ai_allowed_nicknames|tojson }};
+            window.adminWorkerId = {{ admin_worker_id|tojson }};
         </script>
         <script src="{{ url_for('static', filename='js/admin-dashboard.js') }}"></script>
     </body>
