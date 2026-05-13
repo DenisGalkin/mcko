@@ -21,11 +21,9 @@ def get_user_answer_expression() -> str:
     return "CASE WHEN TRIM(COALESCE(admin_answer, '')) <> '' THEN admin_answer ELSE ai_answer END"
 
 
-def get_user_priority_params(user_id: int, exclude_submission_id: int | None = None) -> dict[str, int]:
-    exclude_clause = "AND s.id <> :exclude_submission_id" if exclude_submission_id is not None else ""
+def get_user_priority_params(user_id: int) -> dict[str, int]:
     params = {
         "user_id": user_id,
-        "exclude_submission_id": exclude_submission_id or 0,
         "default_karma": DEFAULT_USER_KARMA,
     }
     row = execute_text(
@@ -52,7 +50,6 @@ def get_user_priority_params(user_id: int, exclude_submission_id: int | None = N
             END), 0) AS pending_tasks_count
         FROM submissions s
         WHERE s.user_id = :user_id
-        {exclude_clause}
         """,
         params,
     ).mappings().first()
@@ -64,14 +61,49 @@ def get_user_priority_params(user_id: int, exclude_submission_id: int | None = N
     }
 
 
-def calculate_task_priority(user_id: int, exclude_submission_id: int | None = None) -> int:
-    params = get_user_priority_params(user_id, exclude_submission_id)
+def calculate_task_priority(user_id: int) -> int:
+    params = get_user_priority_params(user_id)
     return (
         params["user_karma"]
         - (params["admin_answers_count"] * 15)
         - (params["ai_answers_count"] * 5)
         - (params["pending_tasks_count"] * 5)
     )
+
+
+def recalculate_user_task_priorities(user_id: int, session: Session | None = None) -> int:
+    task_priority = calculate_task_priority(user_id)
+    result = execute_text(
+        """
+        UPDATE submissions
+        SET task_priority = :task_priority,
+            updated_at = :updated_at
+        WHERE user_id = :user_id
+        """,
+        {
+            "task_priority": task_priority,
+            "updated_at": current_timestamp(),
+            "user_id": user_id,
+        },
+        session,
+    )
+    return result.rowcount
+
+
+def recalculate_priorities_for_nickname(nickname: str) -> int:
+    rows = execute_text(
+        """
+        SELECT id
+        FROM users
+        WHERE nickname = :nickname COLLATE NOCASE
+        """,
+        {"nickname": nickname},
+    ).mappings().all()
+    updated_count = 0
+    for row in rows:
+        updated_count += recalculate_user_task_priorities(int(row["id"]))
+    db_session.commit()
+    return updated_count
 
 
 def fetch_teacher_answers(user_id: int) -> dict[str, str]:
@@ -208,18 +240,20 @@ def delete_submission_file_rows(submission_id: int, session: Session | None = No
 
 def create_submission(user_id: int, task_number: str, text_content: str) -> int:
     timestamp = current_timestamp()
-    task_priority = calculate_task_priority(user_id)
     result = db_session.get_session().execute(
         insert(submissions).values(
             user_id=user_id,
             task_number=task_number,
             text_content=text_content,
-            task_priority=task_priority,
+            task_priority=0,
+            submitted_at=timestamp,
             created_at=timestamp,
             updated_at=timestamp,
         )
     )
-    return int(result.inserted_primary_key[0])
+    submission_id = int(result.inserted_primary_key[0])
+    recalculate_user_task_priorities(user_id)
+    return submission_id
 
 
 def find_latest_submission_for_task(user_id: int, task_number: str) -> dict | None:
@@ -241,17 +275,19 @@ def reset_submission_content(submission_id: int, text_content: str) -> None:
         "SELECT user_id FROM submissions WHERE id = :submission_id",
         {"submission_id": submission_id},
     ).mappings().first()
-    task_priority = calculate_task_priority(int(row["user_id"]), submission_id) if row else 0
+    user_id = int(row["user_id"]) if row else 0
+    timestamp = current_timestamp()
     execute_text(
         """
         UPDATE submissions
         SET text_content = :text_content,
             admin_answer = '',
             ai_answer = '',
-            task_priority = :task_priority,
+            task_priority = 0,
             ai_processing_at = NULL,
             admin_processing_by = '',
             admin_processing_at = NULL,
+            submitted_at = :submitted_at,
             answered_at = NULL,
             ai_generated_at = NULL,
             updated_at = :updated_at
@@ -259,11 +295,13 @@ def reset_submission_content(submission_id: int, text_content: str) -> None:
         """,
         {
             "text_content": text_content,
-            "task_priority": task_priority,
-            "updated_at": current_timestamp(),
+            "submitted_at": timestamp,
+            "updated_at": timestamp,
             "submission_id": submission_id,
         },
     )
+    if user_id:
+        recalculate_user_task_priorities(user_id)
 
 
 def get_submission_files(submission_id: int, session: Session | None = None) -> list[dict]:
@@ -321,6 +359,7 @@ def build_submission_payload(base: dict) -> dict:
             "filename": filename,
             "file_url": file_url,
             "created": base.get("created_at", ""),
+            "submitted_at": base.get("submitted_at") or base.get("created_at", ""),
             "task_text": base.get("text_content", ""),
             "checked_by_teacher": False,
         }
@@ -335,7 +374,7 @@ def fetch_submission(submission_id: int, session: Session | None = None) -> dict
                u.current_task AS user_current_task,
                s.task_number, s.text_content, s.admin_answer, s.ai_answer,
                s.task_priority, s.ai_processing_at, s.admin_processing_by, s.admin_processing_at,
-               s.created_at, s.updated_at, s.answered_at, s.ai_generated_at
+               s.submitted_at, s.created_at, s.updated_at, s.answered_at, s.ai_generated_at
         FROM submissions s
         LEFT JOIN users u ON u.id = s.user_id
         WHERE s.id = :submission_id
@@ -360,6 +399,7 @@ def fetch_submission(submission_id: int, session: Session | None = None) -> dict
             "ai_processing_at": row["ai_processing_at"],
             "admin_processing_by": row["admin_processing_by"],
             "admin_processing_at": row["admin_processing_at"],
+            "submitted_at": row["submitted_at"] or row["created_at"],
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],
             "answered_at": row["answered_at"],
@@ -376,12 +416,13 @@ def fetch_submissions() -> list[dict]:
                u.current_task AS user_current_task,
                s.task_number, s.text_content, s.admin_answer, s.ai_answer,
                s.task_priority, s.ai_processing_at, s.admin_processing_by, s.admin_processing_at,
-               s.created_at, s.updated_at, s.answered_at, s.ai_generated_at
+               s.submitted_at, s.created_at, s.updated_at, s.answered_at, s.ai_generated_at
         FROM submissions s
         LEFT JOIN users u ON u.id = s.user_id
         ORDER BY
             s.task_priority DESC,
-            s.id ASC,
+            COALESCE(s.submitted_at, s.created_at) DESC,
+            s.id DESC,
             CASE s.task_number
                 WHEN '1' THEN 1
                 WHEN '2' THEN 2
@@ -425,6 +466,7 @@ def fetch_submissions() -> list[dict]:
                 "ai_processing_at": row["ai_processing_at"],
                 "admin_processing_by": row["admin_processing_by"],
                 "admin_processing_at": row["admin_processing_at"],
+                "submitted_at": row["submitted_at"] or row["created_at"],
                 "created_at": row["created_at"],
                 "updated_at": row["updated_at"],
                 "answered_at": row["answered_at"],
@@ -475,6 +517,10 @@ def fetch_user_summary_uploads(user_id: int) -> list[dict]:
 
 def update_submission_admin_answer(submission_id: int, answer_text: str) -> int:
     timestamp = current_timestamp()
+    row = execute_text(
+        "SELECT user_id FROM submissions WHERE id = :submission_id",
+        {"submission_id": submission_id},
+    ).mappings().first()
     result = execute_text(
         """
         UPDATE submissions
@@ -492,6 +538,8 @@ def update_submission_admin_answer(submission_id: int, answer_text: str) -> int:
             "submission_id": submission_id,
         },
     )
+    if result.rowcount and row:
+        recalculate_user_task_priorities(int(row["user_id"]))
     db_session.commit()
     return result.rowcount
 
@@ -523,15 +571,15 @@ def claim_submission_for_admin(submission_id: int, admin_worker_id: str) -> tupl
         """
         SELECT id
         FROM submissions
-        WHERE admin_processing_by = :admin_worker_id
-          AND id <> :submission_id
+        WHERE id <> :submission_id
+          AND TRIM(COALESCE(admin_processing_by, '')) <> ''
           AND TRIM(COALESCE(admin_answer, '')) = ''
         LIMIT 1
         """,
         {"admin_worker_id": admin_worker_id, "submission_id": submission_id},
     ).mappings().first()
     if existing:
-        return False, "Сначала снимите с обработки предыдущее задание или ответьте на старое."
+        return False, "Сначала снимите с обработки предыдущее задание или ответьте на него."
 
     result = execute_text(
         """
@@ -589,6 +637,11 @@ def update_submission_ai_answer(
     session: Session | None = None,
 ) -> int:
     timestamp = current_timestamp()
+    row = execute_text(
+        "SELECT user_id FROM submissions WHERE id = :submission_id",
+        {"submission_id": submission_id},
+        session,
+    ).mappings().first()
     if set_answered_at_if_empty:
         sql = """
             UPDATE submissions
@@ -622,4 +675,6 @@ def update_submission_ai_answer(
         },
         session,
     )
+    if result.rowcount and row:
+        recalculate_user_task_priorities(int(row["user_id"]), session)
     return result.rowcount

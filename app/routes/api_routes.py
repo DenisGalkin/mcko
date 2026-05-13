@@ -177,4 +177,4 @@ def patch_task(task_key: str):
         updated_count = submissions.update_submission_admin_answer(submission_id, answer_text)
         if updated_count == 0:
             return jsonify({"ok": False, "error": "Загрузка не найдена."}), 404
-    return jsonify({"ok": True, "task": submissions.fetch_submission(submission_id)})
+    return jsonify({"ok": True, "task": submissions.fetch_submission(submission_id), "tasks": submissions.fetch_submissions()})

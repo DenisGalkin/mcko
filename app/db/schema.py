@@ -35,6 +35,7 @@ submissions = Table(
     Column("ai_processing_at", Text),
     Column("admin_processing_by", Text, nullable=False, server_default=""),
     Column("admin_processing_at", Text),
+    Column("submitted_at", Text),
     Column("created_at", Text, nullable=False),
     Column("updated_at", Text, nullable=False),
     Column("answered_at", Text),
@@ -71,7 +72,7 @@ app_settings = Table(
 Index("idx_submissions_user_task_id", submissions.c.user_id, submissions.c.task_number, submissions.c.id.desc())
 Index("idx_submissions_user_answer", submissions.c.user_id, submissions.c.admin_answer, submissions.c.ai_answer)
 Index("idx_submissions_user_id_desc", submissions.c.user_id, submissions.c.id.desc())
-Index("idx_submissions_priority", submissions.c.task_priority.desc(), submissions.c.id)
+Index("idx_submissions_priority", submissions.c.task_priority.desc(), submissions.c.submitted_at.desc(), submissions.c.id.desc())
 Index("idx_submission_files_submission", submission_files.c.submission_id, submission_files.c.id)
 Index("idx_users_nickname_nocase", users.c.nickname.collate("NOCASE"))
 Index("idx_ai_allowed_nickname_nocase", ai_allowed_nicknames.c.nickname.collate("NOCASE"))
@@ -105,7 +106,7 @@ def ensure_indexes() -> None:
         """,
         """
         CREATE INDEX IF NOT EXISTS idx_submissions_priority
-        ON submissions (task_priority DESC, id)
+        ON submissions (task_priority DESC, submitted_at DESC, id DESC)
         """,
         """
         CREATE INDEX IF NOT EXISTS idx_submission_files_submission
@@ -134,6 +135,7 @@ def init_db() -> None:
     ensure_column("submissions", "ai_processing_at", "TEXT")
     ensure_column("submissions", "admin_processing_by", "TEXT NOT NULL DEFAULT ''")
     ensure_column("submissions", "admin_processing_at", "TEXT")
+    ensure_column("submissions", "submitted_at", "TEXT")
     ensure_column("users", "current_task", "TEXT NOT NULL DEFAULT ''")
     ensure_column("ai_allowed_nicknames", "ai_enabled", "INTEGER NOT NULL DEFAULT 1")
     ensure_column("ai_allowed_nicknames", "karma", "INTEGER NOT NULL DEFAULT 100")
@@ -173,4 +175,7 @@ def init_db() -> None:
         connection.execute(
             text("UPDATE submissions SET user_id = :user_id WHERE COALESCE(user_id, 0) = 0"),
             {"user_id": legacy_user_id},
+        )
+        connection.execute(
+            text("UPDATE submissions SET submitted_at = created_at WHERE TRIM(COALESCE(submitted_at, '')) = ''")
         )

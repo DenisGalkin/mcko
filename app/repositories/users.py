@@ -57,6 +57,9 @@ def update_user_nickname(user_id: int, nickname: str) -> None:
         "UPDATE users SET nickname = :nickname, updated_at = :updated_at WHERE id = :user_id",
         {"nickname": nickname, "updated_at": current_timestamp(), "user_id": user_id},
     )
+    from . import submissions
+
+    submissions.recalculate_user_task_priorities(user_id)
     db_session.commit()
 
 

@@ -86,7 +86,13 @@ def save_admin_answer(submission_id: int):
         return redirect(url_for("admin.admin"))
 
     if request.is_json:
-        return jsonify({"ok": True, "submission": submissions.fetch_submission(submission_id)})
+        return jsonify(
+            {
+                "ok": True,
+                "submission": submissions.fetch_submission(submission_id),
+                "submissions": submissions.fetch_submissions(),
+            }
+        )
     flash("Ответ администратора сохранен.", "success")
     return redirect(url_for("admin.admin"))
 
@@ -106,4 +112,10 @@ def generate_ai(submission_id: int):
 
     submissions.update_submission_ai_answer(submission_id, ai_answer)
     db_session.commit()
-    return jsonify({"ok": True, "submission": submissions.fetch_submission(submission_id)})
+    return jsonify(
+        {
+            "ok": True,
+            "submission": submissions.fetch_submission(submission_id),
+            "submissions": submissions.fetch_submissions(),
+        }
+    )

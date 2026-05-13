@@ -66,6 +66,7 @@ function normalizeTasks(tasks) {
       filename: task.filename || "",
       file_url: task.file_url || "",
       created: task.created || task.created_at || "",
+      submitted_at: task.submitted_at || task.created || task.created_at || "",
       answer_source: task.answer_source || "",
       task_priority: Number(task.task_priority || 0),
       visible_status: task.visible_status || getVisibleStatus(task),
@@ -80,6 +81,8 @@ function normalizeTasks(tasks) {
 function compareAdminTasks(a, b) {
   const priorityDiff = Number(b.task_priority || 0) - Number(a.task_priority || 0);
   if (priorityDiff !== 0) return priorityDiff;
+  const submittedDiff = String(b.submitted_at || "").localeCompare(String(a.submitted_at || ""));
+  if (submittedDiff !== 0) return submittedDiff;
   return String(a.task_number || "").localeCompare(String(b.task_number || ""), undefined, {
     numeric: true,
   });
@@ -96,6 +99,7 @@ function buildTasksSnapshot(tasks) {
       String(task.task_number || ""),
       String(task.filename || ""),
       String(task.created || ""),
+      String(task.submitted_at || ""),
       String(task.answer_text || ""),
       String(task.answer_source || ""),
       Number(task.task_priority || 0),
@@ -128,6 +132,10 @@ function getVisibleStatus(task) {
 function isTaskUserAiAllowed(task) {
   const nickname = String(task.user_nickname || "").trim().toLowerCase();
   return Boolean(nickname) && state.aiAllowed.some((item) => item.toLowerCase() === nickname);
+}
+
+function hasAnyTaskInAdminProgress(exceptTaskKey = "") {
+  return state.tasks.some((task) => task.task_key !== exceptTaskKey && task.admin_processing);
 }
 
 function getFilteredTasks() {
@@ -284,13 +292,15 @@ function renderEditor(task) {
   adminEditor.hidden = false;
   adminEmpty.hidden = true;
   adminTaskTitle.textContent = `№${task.task_number}`;
-  adminTaskCreated.textContent = task.created ? `Создано: ${task.created}` : "";
+  adminTaskCreated.textContent = task.submitted_at ? `Отправлено: ${task.submitted_at}` : "";
   adminTaskStatus.textContent = getAnswerStatusLabel(task);
   adminTaskStatus.classList.toggle("is-solved", Boolean(task.answer_text.trim()));
   adminTaskStatus.classList.toggle("is-processing", getVisibleStatus(task) === "в обработке");
   adminAnswerText.value = task.answer_text || "";
   adminInProgressToggle.checked = Boolean(task.admin_processing);
-  adminInProgressToggle.disabled = Boolean(String(task.admin_answer || "").trim());
+  adminInProgressToggle.disabled = Boolean(String(task.admin_answer || "").trim()) || (
+    !task.admin_processing && hasAnyTaskInAdminProgress(task.task_key)
+  );
   if (adminTaskTextBlock) {
     const taskText = String(task.task_text || "").trim();
     adminTaskTextBlock.hidden = !taskText;
@@ -331,9 +341,15 @@ async function saveCurrentTask(fields) {
     const data = await response.json();
     if (!response.ok || !data.ok) {
       showFlash(data.error || "Не удалось сохранить", true);
+      renderEditor(task);
       return;
     }
-    updateTaskInState(data.task);
+    if (Array.isArray(data.tasks)) {
+      state.tasks = normalizeTasks(data.tasks);
+      state.snapshot = buildTasksSnapshot(state.tasks);
+    } else {
+      updateTaskInState(data.task);
+    }
     renderStats();
     renderUserFilter();
     renderTaskList();

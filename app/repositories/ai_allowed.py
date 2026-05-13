@@ -107,6 +107,9 @@ def upsert_special_login(nickname: str, ai_enabled: bool = True, karma: int = DE
             "updated_at": timestamp,
         },
     )
+    from . import submissions
+
+    submissions.recalculate_priorities_for_nickname(nickname)
     db_session.commit()
 
 
@@ -126,6 +129,9 @@ def update_special_login(nickname: str, ai_enabled: bool, karma: int) -> int:
             "updated_at": current_timestamp(),
         },
     )
+    from . import submissions
+
+    submissions.recalculate_priorities_for_nickname(nickname)
     db_session.commit()
     return result.rowcount
 
@@ -135,6 +141,9 @@ def remove_ai_allowed_nickname(nickname: str) -> None:
         "DELETE FROM ai_allowed_nicknames WHERE nickname = :nickname COLLATE NOCASE",
         {"nickname": nickname},
     )
+    from . import submissions
+
+    submissions.recalculate_priorities_for_nickname(nickname)
     db_session.commit()
 
 
