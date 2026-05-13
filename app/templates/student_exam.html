@@ -23,6 +23,19 @@
         .qnum.yellow { background: #ffff88; border-color: #333399; }
         .qnum.answered:hover,
         .qnum.yellow:hover { background: #f0f044; }
+        .task-buttons .qnum.qramka,
+        .task-buttons .qnum.qramka.answered,
+        .task-buttons .qnum.qramka.yellow,
+        .task-buttons .qnum.qramka:focus,
+        .task-buttons .qnum.qramka:active {
+            border: 3px solid #ff4444;
+            border-radius: 0;
+        }
+        .task-buttons .qnum:focus,
+        .task-buttons .qnum:active {
+            outline: none;
+            border-radius: 0;
+        }
         .task-buttons {
             padding-left: 8px;
             clear: both;
@@ -244,8 +257,9 @@
         </table>
         <div class="task-buttons">
             <button class="qnum" type="button" id="descriptionBtn">Описание</button>
+            {% set active_task = current_user.current_task or '6.1' %}
             {% for task in task_numbers %}
-                <button class="qnum {% if task == '6.1' %}qramka{% endif %} {% if task in answered_tasks %}answered yellow{% endif %}" type="button" data-task="{{ task }}">{{ task }}</button>
+                <button class="qnum {% if task == active_task %}qramka selected-task{% endif %} {% if task in answered_tasks %}answered yellow{% endif %}" type="button" data-task="{{ task }}">{{ task }}</button>
             {% endfor %}
             <button class="qnum" type="button" id="finishBtn">закончить</button>
         </div>
@@ -561,8 +575,10 @@
             return false;
         }
         hideTeacherAnswer();
-        document.querySelectorAll(".qnum[data-task]").forEach((item) => item.classList.remove("selected-task"));
-        button.classList.add("selected-task");
+        document.querySelectorAll(".qnum[data-task]").forEach((item) => {
+            item.classList.remove("selected-task", "qramka");
+        });
+        button.classList.add("selected-task", "qramka");
         answerField.value = teacherAnswers[task] || "";
         saveCurrentTask(task);
         return true;
