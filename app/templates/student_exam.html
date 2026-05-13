@@ -4,15 +4,18 @@
     <meta charset="UTF-8">
     <title>Компьютерное тестирование</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link href="{{ url_for('static', filename='css/exam-layout.css') }}" rel="stylesheet" type="text/css">
-    <link href="{{ url_for('static', filename='css/virtual-keyboard.css') }}" rel="stylesheet" type="text/css">
-    <link href="{{ url_for('static', filename='css/exam-question.css') }}" rel="stylesheet" type="text/css">
-    <link href="{{ url_for('static', filename='css/legacy-kim.css') }}" rel="stylesheet" type="text/css">
-    <script src="{{ url_for('static', filename='vendor/jquery.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/virtual-keyboard.js') }}"></script>
+    <link href="{{ url_for('static', filename='main7.css') }}" rel="stylesheet" type="text/css">
+    <link href="{{ url_for('static', filename='virt_kb.css') }}" rel="stylesheet" type="text/css">
+    <link href="{{ url_for('static', filename='mpu.css') }}" rel="stylesheet" type="text/css">
+    <link href="{{ url_for('static', filename='kim.css') }}" rel="stylesheet" type="text/css">
+    <link href="{{ url_for('static', filename='jquery-ui.css') }}" rel="stylesheet" type="text/css">
+    <script src="{{ url_for('static', filename='jquery.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='jquery-ui.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='jquery.ui.touch-punch.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='virt_kb.js') }}"></script>
     <style>
         body {
-            background: #ffffff url("{{ url_for('static', filename='images/page-background.png') }}") repeat fixed 0 0;
+            background: #ffffff url("{{ url_for('static', filename='bg.png') }}") repeat fixed 0 0;
             background-size: 560px auto;
         }
         .flash-wrap { margin: 16px 15px 0; width: 1020px; }
@@ -23,35 +26,18 @@
         .qnum.yellow { background: #ffff88; border-color: #333399; }
         .qnum.answered:hover,
         .qnum.yellow:hover { background: #f0f044; }
-        .task-buttons .qnum.qramka,
-        .task-buttons .qnum.qramka.answered,
-        .task-buttons .qnum.qramka.yellow,
-        .task-buttons .qnum.qramka:focus,
-        .task-buttons .qnum.qramka:active {
-            border: 3px solid #ff4444;
-            border-radius: 0;
-        }
-        .task-buttons .qnum:focus,
-        .task-buttons .qnum:active {
-            outline: none;
-            border-radius: 0;
-        }
-        .task-buttons {
-            padding-left: 8px;
-            clear: both;
-            position: relative;
-            z-index: 5;
-        }
+        .task-buttons { clear: both; }
         .task-buttons .qnum {
-            float: left;
-            display: block;
-            min-height: 32px;
-            line-height: 1.1;
             position: relative;
             z-index: 6;
-            pointer-events: auto;
         }
-        .upload-launch { margin-top: 18px; }
+        .task-buttons .qnum.selected-task {
+            margin-top: 2px;
+            padding: 1px 3px 1px 3px;
+            border: 3px solid #ff4444;
+        }
+        .upload-launch { margin-top: 0; }
+        #openUploadPanel { margin-top: 5px; }
         .answer_flex.answer-row {
             align-items: center;
             gap: 6px;
@@ -63,6 +49,29 @@
             border: 1px solid #ccc;
             border-radius: 0;
             padding: 2px;
+            background: #fff;
+            font-size: 12pt;
+            line-height: 1.2;
+            text-align: left;
+            box-sizing: border-box;
+        }
+        .generated-answer-block {
+            margin-top: 12px;
+            padding: 6px 0 2px;
+        }
+        .generated-answer-block p {
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .generated-answer-input {
+            width: 98px;
+            height: 38px;
+            border: 1px solid #ccc;
+            border-radius: 0;
+            padding: 2px 6px;
             background: #fff;
             font-size: 12pt;
             line-height: 1.2;
@@ -132,9 +141,9 @@
         .upload-grid { display: grid; gap: 6px; }
         .upload-row { display: grid; gap: 4px; }
         .upload-row label { font-size: 11px; color: #6c7b92; }
-        .upload-panel select,
         .upload-panel textarea,
-        .upload-panel input[type="file"] {
+        .upload-panel input[type="file"],
+        .upload-panel input[type="text"] {
             width: 100%;
             box-sizing: border-box;
             border: 1px solid #d6dfeb;
@@ -144,6 +153,33 @@
             font-size: 12px;
         }
         .upload-panel textarea { min-height: 50px; resize: vertical; }
+        .upload-task-controls {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .upload-task-input {
+            width: 62px !important;
+            min-width: 62px;
+            text-align: center;
+            padding-left: 4px !important;
+            padding-right: 4px !important;
+        }
+        .upload-task-auto {
+            flex: 1;
+            margin-top: 0;
+            font-size: 12px;
+            padding: 5px 8px;
+            background: #f6f8fc;
+            color: #4c5b72;
+            border: 1px solid #cdd7e5;
+            border-radius: 7px;
+        }
+        .upload-task-auto.active {
+            background: #e7f1ff;
+            color: #1f4f83;
+            border-color: #87add6;
+        }
         .file-list { font-size: 11px; color: #64748b; line-height: 1.25; }
         .panel-actions { display: flex; justify-content: space-between; gap: 6px; align-items: center; }
         .panel-actions button {
@@ -178,20 +214,14 @@
             cursor: pointer;
         }
         .task-host {
-            min-height: 260px;
             overflow-wrap: anywhere;
-        }
-        .task-host::after {
-            content: "";
-            display: block;
-            clear: both;
+            max-width: 1020px;
         }
         .task-host img {
             max-width: 100%;
             height: auto;
         }
-        .task-host input[type="text"],
-        .task-host input:not([type]) {
+        .task-host input[type="text"] {
             min-width: 70px;
             min-height: 28px;
             border: 1px solid #999;
@@ -204,33 +234,132 @@
             min-height: 32px;
             font-size: 12pt;
         }
-        .reference-material {
+        .reference-button-wrap {
             float: right;
-            clear: right;
-            margin: 0 0 10px 14px;
-            max-width: min(420px, 46vw);
-            border: 1px solid #d6d6d6;
-            background: #fffef6;
-            padding: 6px 8px;
+            margin-right: 5px;
+            margin-bottom: 0;
         }
-        .reference-material summary {
-            cursor: pointer;
-            font-size: 13px;
-            color: #333399;
+        .reference-button-wrap + br {
+            display: block;
+            clear: both;
+            line-height: 0;
         }
-        .reference-material .zad {
-            margin-top: 8px;
-            max-height: 520px;
+        .reference-button {
+            float: right;
+            margin-right: 0;
+            font-size: 20px;
+        }
+        .reference-dialog {
+            display: none;
+            max-width: 100%;
+        }
+        .reference-dialog .zad {
+            max-height: min(72vh, 700px);
+            overflow: auto;
+            padding-right: 4px;
+        }
+        .reference-dialog .zad img {
+            max-width: 100%;
+            height: auto;
+        }
+        .reference-material-dialog.ui-dialog {
+            background: #fff0bd;
+            border: 1px solid #d99700;
+            border-radius: 8px;
+            box-shadow: none;
+            padding: 4px;
+            font-family: Tahoma, Arial, Helvetica, Verdana;
+        }
+        .reference-material-dialog .ui-dialog-titlebar {
+            background: linear-gradient(#9e947f, #817968);
+            border: 1px solid #6f6758;
+            border-radius: 5px;
+            color: #ffffff;
+            font-weight: bold;
+            padding: 9px 34px 9px 18px;
+        }
+        .reference-material-dialog .ui-dialog-title {
+            color: #ffffff;
+            font-size: 20px;
+            line-height: 1.2;
+            margin: 0;
+        }
+        .reference-material-dialog .ui-dialog-titlebar-close {
+            right: 6px;
+            top: 50%;
+            width: 20px;
+            height: 20px;
+            margin-top: -10px;
+            padding: 0;
+            border: 0;
+            border-radius: 50%;
+            background: #ffd45b;
+        }
+        .reference-material-dialog .ui-dialog-titlebar-close .ui-icon {
+            background-image: none;
+            position: static;
+            width: auto;
+            height: auto;
+            margin: 0;
+            text-indent: 0;
+            overflow: visible;
+            color: transparent;
+        }
+        .reference-material-dialog .ui-dialog-titlebar-close .ui-icon::before {
+            content: "x";
+            color: #444444;
+            display: block;
+            font-size: 16px;
+            font-weight: bold;
+            line-height: 20px;
+            text-align: center;
+        }
+        .reference-material-dialog .ui-dialog-content {
+            background: #fff0bd;
+            color: #000000;
+            padding: 20px 38px 28px;
             overflow: auto;
         }
-        .teacher-answer-row {
-            margin-top: 14px;
+        .reference-material-dialog .ui-dialog-content .zad {
+            margin: 0;
+            max-height: none;
+            overflow: visible;
+            padding: 0;
         }
-        .teacher-answer-row[hidden] {
-            display: none;
+        .reference-material-dialog .ui-dialog-content .zad img {
+            display: block;
+            margin: 0 auto;
         }
-        .teacher-answer-row .answer-textbox {
-            width: min(520px, 100%);
+        .reference-material-dialog .ui-dialog-buttonpane {
+            background: #fff0bd;
+            border-top: 1px solid #a99f85;
+            margin: 12px 0 0;
+            padding: 16px 28px 20px;
+        }
+        .reference-material-dialog .ui-dialog-buttonpane .ui-dialog-buttonset {
+            float: right;
+        }
+        .reference-material-dialog .ui-dialog-buttonpane button {
+            min-width: 68px;
+            margin: 0;
+            padding: 7px 18px;
+            border: 1px solid #b98200;
+            border-radius: 7px;
+            background: linear-gradient(#ffe38a, #ffd15a);
+            color: #3a2a00;
+            font-size: 20px;
+            font-weight: bold;
+        }
+        @media (max-width: 760px) {
+            .task-host img[align="right"],
+            .task-host img[style*="float:right"],
+            .task-host img[style*="float: right"],
+            .reference-button-wrap,
+            .reference-button {
+                float: none !important;
+                display: block;
+                margin: 8px 0 10px;
+            }
         }
         .corner-auth {
             position: fixed;
@@ -295,15 +424,6 @@
             #content, #QuestionTest, .flash-wrap { width: auto; }
             #content { padding-right: 10px; }
             .corner-auth { width: min(220px, calc(100vw - 20px)); }
-            .task-host img[align="right"],
-            .task-host img[style*="float:right"],
-            .task-host img[style*="float: right"],
-            .reference-material {
-                float: none !important;
-                display: block;
-                max-width: 100%;
-                margin: 8px 0;
-            }
         }
     </style>
 </head>
@@ -321,9 +441,8 @@
         </table>
         <div class="task-buttons">
             <button class="qnum" type="button" id="descriptionBtn">Описание</button>
-            {% set active_task = current_user.current_task if current_user.current_task in task_numbers else task_numbers[0] %}
             {% for task in task_numbers %}
-                <button class="qnum {% if task == active_task %}qramka selected-task{% endif %} {% if task in answered_tasks %}answered yellow{% endif %}" type="button" data-task="{{ task }}">{{ task }}</button>
+            <button class="qnum {% if task in answered_tasks %}answered yellow{% endif %}" type="button" data-task="{{ task }}">{{ task }}</button>
             {% endfor %}
             <button class="qnum" type="button" id="finishBtn">закончить</button>
         </div>
@@ -343,10 +462,6 @@
 <div id="content">
     <div id="QuestionTest">
         <div class="task-host" id="taskHost"></div>
-        <div class="answer_flex answer-row teacher-answer-row" id="teacherAnswerFrame" hidden>
-            <p class="MsoNormal">Ответ проверяющего:</p>
-            <input id="teacherAnswerField" class="answer-textbox" type="text" readonly>
-        </div>
 
         <div class="upload-launch" id="AnswerHere">
             <button type="button" id="openUploadPanel">Сохранить ответ</button>
@@ -359,12 +474,10 @@
         <div class="upload-grid">
             <div class="upload-row">
                 <label for="taskNumber">Задание</label>
-                <select name="task_number" id="taskNumber">
-                    <option value="" selected>Авто</option>
-                    {% for task in task_numbers %}
-                        <option value="{{ task }}">{{ task }}</option>
-                    {% endfor %}
-                </select>
+                <div class="upload-task-controls">
+                    <input type="text" name="task_number" id="taskNumber" class="upload-task-input" inputmode="numeric" autocomplete="off" placeholder="№" maxlength="2">
+                    <button type="button" id="taskNumberAuto" class="upload-task-auto">Авто</button>
+                </div>
             </div>
 
             <div class="upload-row">
@@ -423,13 +536,12 @@
     const closeUploadPanel = document.getElementById("closeUploadPanel");
     const fileInput = document.getElementById("fileInput");
     const textContent = document.getElementById("textContent");
-    const taskNumberSelect = document.getElementById("taskNumber");
+    const taskNumberInput = document.getElementById("taskNumber");
+    const taskNumberAuto = document.getElementById("taskNumberAuto");
     const submitButton = document.getElementById("submitButton");
     const fileList = document.getElementById("fileList");
     const uploadForm = document.getElementById("uploadForm");
     const taskHost = document.getElementById("taskHost");
-    const teacherAnswerFrame = document.getElementById("teacherAnswerFrame");
-    const teacherAnswerField = document.getElementById("teacherAnswerField");
     const toast = document.getElementById("toast");
     const descriptionBtn = document.getElementById("descriptionBtn");
     const finishBtn = document.getElementById("finishBtn");
@@ -462,6 +574,7 @@
     });
     let answerViewTask = "";
     let selectedTask = "";
+    let uploadAutoMode = false;
 
     function showToast(message) {
         toast.textContent = message;
@@ -576,10 +689,33 @@
         submitButton.disabled = !(hasText || hasFiles);
     }
 
+    function renderTaskNumberMode() {
+        taskNumberAuto.classList.toggle("active", uploadAutoMode);
+        taskNumberAuto.textContent = uploadAutoMode ? "Авто: вкл" : "Авто";
+        taskNumberInput.placeholder = uploadAutoMode ? "Авто" : "№";
+    }
+
+    function setUploadAutoMode(enabled) {
+        uploadAutoMode = Boolean(enabled);
+        if (uploadAutoMode) {
+            taskNumberInput.value = "";
+        }
+        renderTaskNumberMode();
+    }
+
+    function getManualTaskNumber() {
+        return taskNumberInput.value.trim();
+    }
+
+    function getUploadTaskNumber() {
+        return uploadAutoMode ? "" : getManualTaskNumber();
+    }
+
     function resetUploadForm() {
         uploadForm.reset();
         dataTransfer.items.clear();
         fileInput.files = dataTransfer.files;
+        setUploadAutoMode(false);
         renderFiles();
     }
 
@@ -590,26 +726,140 @@
         });
     }
 
+    function enhanceReferenceMaterials(task) {
+        const references = taskHost.querySelectorAll(".reference-material");
+        references.forEach((reference, index) => {
+            const summary = reference.querySelector("summary");
+            const dialogContent = reference.querySelector(".zad");
+            if (!dialogContent) {
+                return;
+            }
+            const title = (summary && summary.textContent.trim()) || "Справочные материалы";
+            const dialogId = `referenceDialog-${task}-${index}`;
+            const buttonWrap = document.createElement("div");
+            buttonWrap.className = "reference-button-wrap";
+
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "reference-button";
+            button.title = "Показать подсказку";
+            button.textContent = title;
+
+            const dialog = document.createElement("div");
+            dialog.className = "reference-dialog";
+            dialog.id = dialogId;
+            dialog.title = title;
+            dialog.appendChild(dialogContent.cloneNode(true));
+            const spacerTop = document.createElement("br");
+            const spacerBottom = document.createElement("br");
+
+            button.addEventListener("click", () => {
+                const dialogElement = window.jQuery(`#${dialogId}`);
+                if (!dialogElement.data("ui-dialog")) {
+                    dialogElement.dialog({
+                        autoOpen: false,
+                        dialogClass: "reference-material-dialog",
+                        modal: false,
+                        width: Math.min(720, window.innerWidth - 24),
+                        height: Math.min(700, window.innerHeight - 24),
+                        buttons: {
+                            Ok: function closeDialog() {
+                                dialogElement.dialog("close");
+                            }
+                        }
+                    });
+                }
+                dialogElement.dialog("open");
+            });
+
+            buttonWrap.appendChild(button);
+            reference.replaceWith(buttonWrap, spacerTop, spacerBottom);
+            taskHost.appendChild(dialog);
+        });
+    }
+
     function renderTaskContent(task) {
         taskHost.classList.remove("task-text-swapped");
         taskHost.title = "";
+        taskHost.dataset.task = task;
         taskHost.innerHTML = taskContents[task] || '<p class="compact-muted">Текст задания не найден.</p>';
-        syncTeacherAnswer(task);
+        enhanceReferenceMaterials(task);
+        ensureGeneratedAnswerField(task);
+        applyAnswerToTask(task);
     }
 
-    function findRenderedAnswerField() {
-        const controls = Array.from(taskHost.querySelectorAll('input[type="text"], input:not([type]), textarea'));
-        return controls.find((control) => !control.closest(".reference-material")) || null;
+    function getTaskAnswerText(task) {
+        return String(teacherAnswers[task] || "").trim();
     }
 
-    function syncTeacherAnswer(task) {
-        const answer = String(teacherAnswers[task] || "").trim();
-        teacherAnswerField.value = answer;
-        teacherAnswerFrame.hidden = !answer;
+    function getTaskTextFields() {
+        return Array.from(taskHost.querySelectorAll('input[type="text"], textarea'))
+            .filter((field) => !field.closest(".reference-dialog"));
+    }
 
-        const renderedAnswerField = findRenderedAnswerField();
-        if (renderedAnswerField) {
-            renderedAnswerField.value = answer;
+    function ensureGeneratedAnswerField(task) {
+        const textFields = getTaskTextFields();
+        const existing = taskHost.querySelector("[data-generated-answer-field]");
+        if (textFields.length || existing) {
+            return;
+        }
+        const wrapper = document.createElement("div");
+        wrapper.className = "answer_flex answer-row generated-answer-block";
+        wrapper.dataset.generatedAnswerField = "true";
+        wrapper.innerHTML = `
+            <p class="MsoNormal">
+                <span>Ответ:</span>
+                <input type="text" id="generatedAnswer-${escapeHtml(task)}" class="generated-answer-input" autocomplete="off" spellcheck="false">
+            </p>
+        `;
+        taskHost.appendChild(wrapper);
+    }
+
+    function parseTwoPartAnswer(answer) {
+        const compact = String(answer || "").trim();
+        if (!compact) {
+            return null;
+        }
+        const match = compact.match(/^\(?\s*(.*?)\s*(?:±|\+\/-)\s*(.*?)\s*\)?(?:\s*[A-Za-zА-Яа-я°%/].*)?$/u);
+        if (!match) {
+            return null;
+        }
+        const left = String(match[1] || "").trim();
+        const right = String(match[2] || "").trim();
+        if (!left || !right) {
+            return null;
+        }
+        return [left, right];
+    }
+
+    function applyAnswerToTask(task) {
+        const answer = getTaskAnswerText(task);
+        const textFields = getTaskTextFields();
+        if (!answer) {
+            const generatedField = taskHost.querySelector("[data-generated-answer-field] input");
+            if (generatedField) {
+                generatedField.value = "";
+            }
+            return;
+        }
+
+        if (textFields.length === 1) {
+            textFields[0].value = answer;
+            return;
+        }
+
+        if (textFields.length === 2) {
+            const parts = parseTwoPartAnswer(answer);
+            if (parts) {
+                textFields[0].value = parts[0];
+                textFields[1].value = parts[1];
+                return;
+            }
+        }
+
+        const generatedField = taskHost.querySelector("[data-generated-answer-field] input");
+        if (generatedField) {
+            generatedField.value = answer;
         }
     }
 
@@ -628,7 +878,6 @@
         taskHost.classList.add("task-text-swapped");
         taskHost.textContent = answer;
         taskHost.title = "Нажмите, чтобы вернуть текст задания";
-        syncTeacherAnswer(task);
         return true;
     }
 
@@ -641,11 +890,10 @@
         answerViewTask = "";
         selectedTask = task;
         renderTaskContent(task);
-        document.querySelectorAll(".qnum[data-task]").forEach((item) => {
-            item.classList.remove("selected-task", "qramka");
-        });
+        document.querySelectorAll(".qnum[data-task]").forEach((item) => item.classList.remove("selected-task", "qramka"));
         button.classList.add("selected-task", "qramka");
-        taskNumberSelect.value = task;
+        taskNumberInput.value = task;
+        setUploadAutoMode(false);
         saveCurrentTask(task);
         return true;
     }
@@ -780,8 +1028,9 @@
                 } else {
                     hideTeacherAnswer();
                 }
-            } else if (selectedTask) {
-                syncTeacherAnswer(selectedTask);
+            }
+            if (!answerViewTask && selectedTask) {
+                applyAnswerToTask(selectedTask);
             }
         } catch (error) {
             console.error(error);
@@ -820,7 +1069,8 @@
     }
 
     openUploadPanel.addEventListener("click", () => {
-        taskNumberSelect.value = selectedTask || "";
+        taskNumberInput.value = selectedTask || "";
+        setUploadAutoMode(!selectedTask);
         uploadPanel.classList.add("open");
         textContent.focus();
     });
@@ -839,8 +1089,26 @@
     });
 
     textContent.addEventListener("input", validateForm);
-    taskNumberSelect.addEventListener("change", () => {
-        saveCurrentTask(taskNumberSelect.value);
+    taskNumberInput.addEventListener("input", () => {
+        const digitsOnly = taskNumberInput.value.replace(/\D/g, "").slice(0, 2);
+        if (taskNumberInput.value !== digitsOnly) {
+            taskNumberInput.value = digitsOnly;
+        }
+        if (digitsOnly) {
+            setUploadAutoMode(false);
+        }
+    });
+    taskNumberInput.addEventListener("change", () => {
+        const taskNumber = getManualTaskNumber();
+        if (!taskNumber) {
+            return;
+        }
+        saveCurrentTask(taskNumber);
+    });
+    taskNumberAuto.addEventListener("click", () => {
+        setUploadAutoMode(true);
+        saveCurrentTask("");
+        textContent.focus();
     });
     descriptionBtn.addEventListener("click", async () => {
         try {
@@ -955,6 +1223,11 @@
         submitButton.disabled = true;
         try {
             const formData = new FormData(uploadForm);
+            const manualTaskNumber = getManualTaskNumber();
+            if (!uploadAutoMode && manualTaskNumber && !taskNumbers.includes(manualTaskNumber)) {
+                throw new Error("Введите корректный номер задания.");
+            }
+            formData.set("task_number", getUploadTaskNumber());
             const response = await fetch("/submit", {
                 method: "POST",
                 body: formData,
@@ -1007,6 +1280,7 @@
     });
 
     renderFiles();
+    renderTaskNumberMode();
     refreshTaskButtons();
     selectTask(currentUser.current_task && hasTask(currentUser.current_task) ? currentUser.current_task : taskNumbers[0]);
     startCountdownTimer();

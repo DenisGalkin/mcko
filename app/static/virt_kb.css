@@ -1,0 +1,13 @@
+div#kb {
+	border:1px solid #444444;
+	position:fixed;
+	bottom:0px;
+	display:none;
+	background-color:#eeeeee;
+	border-radius: 8px;
+	width:1024px;
+}
+div#kb b { font-size:9pt; color:#884444; }
+
+div#kb button { padding-left:7px; padding-right:7px; margin-left:3px; border-radius:3px; min-width:30px; margin-bottom:5px; }
+div#kb button:hover { background-color:#ffffff; }
