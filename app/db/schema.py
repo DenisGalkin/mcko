@@ -63,6 +63,7 @@ app_settings = Table(
 
 Index("idx_submissions_user_task_id", submissions.c.user_id, submissions.c.task_number, submissions.c.id.desc())
 Index("idx_submissions_user_answer", submissions.c.user_id, submissions.c.admin_answer, submissions.c.ai_answer)
+Index("idx_submissions_user_id_desc", submissions.c.user_id, submissions.c.id.desc())
 Index("idx_submission_files_submission", submission_files.c.submission_id, submission_files.c.id)
 Index("idx_users_nickname_nocase", users.c.nickname.collate("NOCASE"))
 Index("idx_ai_allowed_nickname_nocase", ai_allowed_nicknames.c.nickname.collate("NOCASE"))
@@ -80,12 +81,45 @@ def ensure_column(table_name: str, column_name: str, definition: str) -> None:
             connection.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}"))
 
 
+def ensure_indexes() -> None:
+    statements = [
+        """
+        CREATE INDEX IF NOT EXISTS idx_submissions_user_task_id
+        ON submissions (user_id, task_number, id DESC)
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_submissions_user_answer
+        ON submissions (user_id, admin_answer, ai_answer)
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_submissions_user_id_desc
+        ON submissions (user_id, id DESC)
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_submission_files_submission
+        ON submission_files (submission_id, id)
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_users_nickname_nocase
+        ON users (nickname COLLATE NOCASE)
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_ai_allowed_nickname_nocase
+        ON ai_allowed_nicknames (nickname COLLATE NOCASE)
+        """,
+    ]
+    with engine.begin() as connection:
+        for statement in statements:
+            connection.execute(text(statement))
+
+
 def init_db() -> None:
     metadata.create_all(engine)
     ensure_column("submissions", "user_id", "INTEGER NOT NULL DEFAULT 0")
     ensure_column("submissions", "ai_answer", "TEXT NOT NULL DEFAULT ''")
     ensure_column("submissions", "ai_generated_at", "TEXT")
     ensure_column("users", "current_task", "TEXT NOT NULL DEFAULT ''")
+    ensure_indexes()
 
     timestamp = current_timestamp()
     with engine.begin() as connection:

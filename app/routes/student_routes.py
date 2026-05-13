@@ -23,8 +23,7 @@ def with_cookie_if_needed(response, is_new_user: bool, uid: str):
 @student_bp.route("/", methods=["GET"])
 def index():
     current_user, is_new_user = user_service.get_or_create_current_user()
-    answered_tasks, teacher_answers = submissions.fetch_answer_state(current_user["id"])
-    answer_sources = submissions.fetch_answer_sources(current_user["id"])
+    answered_tasks, teacher_answers, answer_sources = submissions.fetch_answer_overview(current_user["id"])
     response = make_response(
         render_template(
             "student_exam.html",
@@ -47,7 +46,7 @@ def save_profile():
     ai_settings = settings.get_ai_settings()
     if nickname and ai_settings.enabled and Config.OPENAI_API_KEY:
         submission_ids = submissions.fetch_unanswered_submission_ids_for_user(current_user["id"])
-        ai_queued = ai_job_runner.maybe_schedule_for_user(current_user, submission_ids)
+        ai_queued = ai_job_runner.maybe_schedule_for_user(current_user, submission_ids, ai_settings)
     response = jsonify({"ok": True, "user": current_user, "ai_queued": ai_queued})
     return with_cookie_if_needed(response, is_new_user, current_user["uid"])
 
@@ -112,8 +111,7 @@ def submit():
 @student_bp.route("/answers", methods=["GET"])
 def answers():
     current_user, is_new_user = user_service.get_or_create_current_user()
-    answered_tasks, teacher_answers = submissions.fetch_answer_state(current_user["id"])
-    answer_sources = submissions.fetch_answer_sources(current_user["id"])
+    answered_tasks, teacher_answers, answer_sources = submissions.fetch_answer_overview(current_user["id"])
     response = jsonify(
         {
             "ok": True,

@@ -134,9 +134,14 @@ class AiJobRunner:
         self.pending_ids: set[int] = set()
         self.pending_lock = threading.Lock()
 
-    def maybe_schedule_for_user(self, user: dict, submission_ids: list[int]) -> int:
+    def maybe_schedule_for_user(
+        self,
+        user: dict,
+        submission_ids: list[int],
+        ai_settings: AiSettings | None = None,
+    ) -> int:
         nickname = normalize_text(user.get("nickname"))
-        ai_settings = settings.get_ai_settings()
+        ai_settings = ai_settings or settings.get_ai_settings()
         if (
             not nickname
             or not ai_settings.enabled

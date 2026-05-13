@@ -85,12 +85,19 @@
             width: min(420px, calc(100vw - 20px));
             max-height: min(430px, calc(100vh - 120px));
             overflow: auto;
-            background: rgba(255, 255, 255, 0.96);
-            border: 1px solid #cdd7e5;
-            box-shadow: 0 10px 24px rgba(51, 65, 85, 0.12);
+            background: rgba(255, 255, 255, 0.78);
+            border: 1px solid rgba(177, 190, 209, 0.72);
+            box-shadow: 0 10px 24px rgba(51, 65, 85, 0.10);
+            backdrop-filter: blur(6px);
             padding: 8px;
             z-index: 1001;
             display: none;
+        }
+        .compact-panel.answers-panel {
+            width: fit-content;
+            min-width: 170px;
+            max-width: calc(100vw - 20px);
+            background: rgba(255, 255, 255, 0.74);
         }
         .compact-panel.open { display: block; }
         .compact-panel-head {
@@ -120,56 +127,88 @@
         .compact-files { margin-top: 3px; color: #475569; }
         .compact-text {
             margin-top: 3px;
-            max-height: 42px;
+            max-width: 100%;
             overflow: hidden;
-            white-space: pre-wrap;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+        }
+        .compact-answer-item {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+            white-space: nowrap;
+        }
+        .compact-answer-text {
+            display: inline-block;
+            max-width: min(780px, calc(100vw - 94px));
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            vertical-align: bottom;
         }
         .upload-panel {
             position: fixed;
             left: 10px;
             bottom: 10px;
-            width: min(235px, calc(100vw - 18px));
-            background: rgba(252, 253, 255, 0.88);
-            border: 1px solid #dbe3ef;
+            width: min(286px, calc(100vw - 18px));
+            background: rgba(252, 253, 255, 0.92);
+            border: 1px solid rgba(198, 210, 227, 0.9);
             border-radius: 10px;
-            box-shadow: 0 8px 22px rgba(70, 92, 125, 0.10);
-            padding: 8px;
+            box-shadow: 0 10px 28px rgba(70, 92, 125, 0.13);
+            padding: 9px;
             display: none;
             z-index: 1000;
+            backdrop-filter: blur(6px);
         }
         .upload-panel.open { display: block; }
-        .upload-grid { display: grid; gap: 6px; }
+        .upload-grid { display: grid; gap: 7px; }
+        .upload-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+        .upload-title {
+            color: #253247;
+            font-size: 13px;
+            font-weight: 700;
+        }
         .upload-row { display: grid; gap: 4px; }
-        .upload-row label { font-size: 11px; color: #6c7b92; }
+        .upload-row label { font-size: 11px; color: #63728a; }
         .upload-panel textarea,
-        .upload-panel input[type="file"],
         .upload-panel input[type="text"] {
             width: 100%;
             box-sizing: border-box;
-            border: 1px solid #d6dfeb;
+            border: 1px solid #cfd9e8;
             border-radius: 7px;
-            padding: 5px 7px;
-            background: rgba(249, 251, 255, 0.92);
+            padding: 6px 8px;
+            background: rgba(249, 251, 255, 0.96);
             font-size: 12px;
         }
-        .upload-panel textarea { min-height: 50px; resize: vertical; }
+        .upload-panel textarea {
+            min-height: 58px;
+            max-height: 140px;
+            resize: vertical;
+            line-height: 1.35;
+        }
         .upload-task-controls {
-            display: flex;
+            display: grid;
+            grid-template-columns: 76px 1fr;
             align-items: center;
             gap: 6px;
         }
         .upload-task-input {
-            width: 62px !important;
-            min-width: 62px;
+            width: 100% !important;
+            min-width: 0;
             text-align: center;
             padding-left: 4px !important;
             padding-right: 4px !important;
+            font-weight: 700;
         }
         .upload-task-auto {
-            flex: 1;
             margin-top: 0;
             font-size: 12px;
-            padding: 5px 8px;
+            padding: 6px 8px;
             background: #f6f8fc;
             color: #4c5b72;
             border: 1px solid #cdd7e5;
@@ -179,16 +218,77 @@
             background: #e7f1ff;
             color: #1f4f83;
             border-color: #87add6;
+            font-weight: 700;
         }
-        .file-list { font-size: 11px; color: #64748b; line-height: 1.25; }
-        .panel-actions { display: flex; justify-content: space-between; gap: 6px; align-items: center; }
+        .upload-file-line {
+            display: grid;
+            grid-template-columns: 1fr 30px;
+            gap: 6px;
+            align-items: center;
+        }
+        .upload-file-input {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            opacity: 0;
+            pointer-events: none;
+        }
+        .upload-file-button,
+        .panel-actions button {
+            border-radius: 7px;
+            box-sizing: border-box;
+        }
+        .upload-file-button {
+            display: block;
+            min-width: 0;
+            padding: 6px 8px;
+            overflow: hidden;
+            border: 1px dashed #aebbd0;
+            background: rgba(246, 248, 252, 0.96);
+            color: #3f4d62;
+            font-size: 12px;
+            text-align: center;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            cursor: pointer;
+        }
+        .upload-file-button:hover { background: #eef4fb; }
+        .upload-clear-files {
+            width: 30px;
+            min-width: 30px;
+            height: 30px;
+            margin-top: 0;
+            padding: 0;
+            border: 1px solid #cdd7e5;
+            border-radius: 7px;
+            background: #f6f8fc;
+            color: #64748b;
+            font-size: 14px;
+        }
+        .upload-clear-files[disabled] { opacity: 0.45; cursor: not-allowed; }
+        .file-list {
+            min-height: 15px;
+            overflow: hidden;
+            color: #64748b;
+            font-size: 11px;
+            line-height: 1.25;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .panel-actions { display: grid; grid-template-columns: 1fr 1fr 1.3fr; gap: 6px; align-items: center; }
         .panel-actions button {
             margin-top: 0;
             font-size: 12px;
-            padding: 4px 8px;
+            padding: 6px 8px;
             background: #f6f8fc;
             color: #4c5b72;
             border: 1px solid #cdd7e5;
+        }
+        .panel-actions .submit-action {
+            background: #eaf4ff;
+            border-color: #9dbde1;
+            color: #214c7a;
+            font-weight: 700;
         }
         .panel-actions button[disabled] { opacity: 0.55; cursor: not-allowed; }
         .toast {
@@ -472,17 +572,25 @@
 <div class="upload-panel" id="uploadPanel">
     <form method="post" action="{{ url_for('student.submit') }}" enctype="multipart/form-data" id="uploadForm" autocomplete="off">
         <div class="upload-grid">
+            <div class="upload-head">
+                <div class="upload-title" id="uploadTitle">Ответ к заданию</div>
+            </div>
+
             <div class="upload-row">
-                <label for="taskNumber">Задание</label>
+                <label for="taskNumber">Номер задания</label>
                 <div class="upload-task-controls">
-                    <input type="text" name="task_number" id="taskNumber" class="upload-task-input" inputmode="numeric" autocomplete="off" placeholder="№" maxlength="2">
-                    <button type="button" id="taskNumberAuto" class="upload-task-auto">Авто</button>
+                    <input type="text" name="task_number" id="taskNumber" class="upload-task-input" inputmode="numeric" autocomplete="off" placeholder="№" maxlength="2" aria-label="Номер задания">
+                    <button type="button" id="taskNumberAuto" class="upload-task-auto" title="Загрузить в следующий свободный номер по порядку">Авто</button>
                 </div>
             </div>
 
             <div class="upload-row">
                 <label for="fileInput">Файл</label>
-                <input type="file" id="fileInput" name="files" multiple>
+                <div class="upload-file-line">
+                    <label for="fileInput" class="upload-file-button" id="filePickLabel">Выбрать файл</label>
+                    <button type="button" class="upload-clear-files" id="clearFilesBtn" title="Очистить файлы" disabled>x</button>
+                </div>
+                <input type="file" id="fileInput" class="upload-file-input" name="files" multiple>
             </div>
 
             <div class="upload-row">
@@ -491,12 +599,13 @@
 
             <div class="upload-row">
                 <label for="textContent">Текст</label>
-                <textarea name="text_content" id="textContent" placeholder=""></textarea>
+                <textarea name="text_content" id="textContent" placeholder="Можно написать ответ или прикрепить файл"></textarea>
             </div>
 
             <div class="panel-actions">
-                <button type="button" id="closeUploadPanel">x</button>
-                <button type="submit" id="submitButton" disabled>ok</button>
+                <button type="button" id="closeUploadPanel">Отмена</button>
+                <button type="button" id="pasteUploadBtn">Буфер</button>
+                <button type="submit" id="submitButton" class="submit-action" disabled>Отправить</button>
             </div>
         </div>
     </form>
@@ -535,9 +644,13 @@
     const openUploadPanel = document.getElementById("openUploadPanel");
     const closeUploadPanel = document.getElementById("closeUploadPanel");
     const fileInput = document.getElementById("fileInput");
+    const filePickLabel = document.getElementById("filePickLabel");
+    const clearFilesBtn = document.getElementById("clearFilesBtn");
     const textContent = document.getElementById("textContent");
     const taskNumberInput = document.getElementById("taskNumber");
     const taskNumberAuto = document.getElementById("taskNumberAuto");
+    const uploadTitle = document.getElementById("uploadTitle");
+    const pasteUploadBtn = document.getElementById("pasteUploadBtn");
     const submitButton = document.getElementById("submitButton");
     const fileList = document.getElementById("fileList");
     const uploadForm = document.getElementById("uploadForm");
@@ -627,9 +740,13 @@
         return data;
     }
 
-    function openCompactPanel(title, content) {
+    function openCompactPanel(title, content, mode = "") {
         compactPanelTitle.textContent = title;
         compactPanelBody.innerHTML = content;
+        compactPanel.classList.remove("uploads-panel", "answers-panel");
+        if (mode) {
+            compactPanel.classList.add(`${mode}-panel`);
+        }
         compactPanel.classList.add("open");
     }
 
@@ -646,7 +763,7 @@
         }
         return uploads.map((item) => {
             const files = (item.files || []).map((file) => escapeHtml(file.original_name)).join(", ");
-            const text = String(item.text_content || "").trim();
+            const text = String(item.text_content || "").trim().split(/\r?\n/)[0].trim();
             return `
                 <div class="compact-item">
                     <strong>№${escapeHtml(item.task_number)}</strong>
@@ -662,17 +779,21 @@
         return taskNumbersList.map((task) => {
             const answer = String((answers || {})[task] || "").trim();
             return `
-                <div class="compact-item">
+                <div class="compact-item compact-answer-item">
                     <strong>№${escapeHtml(task)}</strong>
-                    ${answer ? `<span>${escapeHtml(answer)}</span>` : '<span class="compact-muted">нет ответа</span>'}
+                    ${answer ? `<span class="compact-answer-text" title="${escapeHtml(answer)}">${escapeHtml(answer)}</span>` : '<span class="compact-muted">нет ответа</span>'}
                 </div>
             `;
         }).join("");
     }
 
     function renderFiles() {
-        const names = Array.from(fileInput.files).map((file, index) => `${index + 1}. ${file.name}`);
-        fileList.textContent = names.length ? names.join(" | ") : "Файлы не выбраны";
+        const names = Array.from(fileInput.files).map((file) => file.name);
+        const count = names.length;
+        filePickLabel.textContent = count ? `Файлы: ${count}` : "Выбрать файл";
+        clearFilesBtn.disabled = count === 0;
+        fileList.textContent = count ? names.join(" | ") : "Файлы не выбраны";
+        fileList.title = count ? names.join("\n") : "";
         validateForm();
     }
 
@@ -692,8 +813,12 @@
 
     function renderTaskNumberMode() {
         taskNumberAuto.classList.toggle("active", uploadAutoMode);
-        taskNumberAuto.textContent = uploadAutoMode ? "Авто: вкл" : "Авто";
-        taskNumberInput.placeholder = uploadAutoMode ? "Авто" : "№";
+        taskNumberAuto.setAttribute("aria-pressed", uploadAutoMode ? "true" : "false");
+        taskNumberAuto.textContent = uploadAutoMode ? "По порядку" : "Авто";
+        taskNumberInput.placeholder = uploadAutoMode ? "авто" : "№";
+        uploadTitle.textContent = uploadAutoMode
+            ? "Ответ по порядку"
+            : `Ответ к заданию ${getManualTaskNumber() || ""}`.trim();
     }
 
     function setUploadAutoMode(enabled) {
@@ -830,12 +955,41 @@
             return;
         }
         const formData = new FormData();
-        formData.set("task_number", selectedTask || getUploadTaskNumber());
+        formData.set("task_number", uploadAutoMode ? "" : (getManualTaskNumber() || selectedTask || ""));
         formData.set("text_content", clipboardPayload.text);
         for (const file of clipboardPayload.files) {
             formData.append("files", file, file.name);
         }
         await submitAnswerForm(formData);
+    }
+
+    async function pasteClipboardIntoUploadForm() {
+        if (!navigator.clipboard) {
+            showToast("Буфер обмена недоступен");
+            return;
+        }
+        let clipboardPayload = null;
+        try {
+            clipboardPayload = await readClipboardPayload();
+        } catch (error) {
+            showToast("Не удалось прочитать буфер обмена");
+            return;
+        }
+        if (!clipboardPayload.text && !clipboardPayload.files.length) {
+            showToast("Буфер обмена пуст");
+            return;
+        }
+        if (clipboardPayload.text) {
+            textContent.value = textContent.value.trim()
+                ? `${textContent.value.trim()}\n${clipboardPayload.text}`
+                : clipboardPayload.text;
+        }
+        if (clipboardPayload.files.length) {
+            syncFiles(clipboardPayload.files);
+        } else {
+            validateForm();
+        }
+        showToast("Добавлено из буфера");
     }
 
     function refreshTaskButtons() {
@@ -1189,7 +1343,7 @@
 
     openUploadPanel.addEventListener("click", () => {
         taskNumberInput.value = selectedTask || "";
-        setUploadAutoMode(!selectedTask);
+        setUploadAutoMode(false);
         uploadPanel.classList.add("open");
         textContent.focus();
     });
@@ -1197,6 +1351,14 @@
     closeUploadPanel.addEventListener("click", () => {
         uploadPanel.classList.remove("open");
     });
+
+    clearFilesBtn.addEventListener("click", () => {
+        dataTransfer.items.clear();
+        fileInput.files = dataTransfer.files;
+        renderFiles();
+    });
+
+    pasteUploadBtn.addEventListener("click", pasteClipboardIntoUploadForm);
 
     fileInput.addEventListener("change", () => {
         dataTransfer.items.clear();
@@ -1215,6 +1377,8 @@
         }
         if (digitsOnly) {
             setUploadAutoMode(false);
+        } else {
+            setUploadAutoMode(true);
         }
     });
     taskNumberInput.addEventListener("change", () => {
@@ -1226,13 +1390,12 @@
     });
     taskNumberAuto.addEventListener("click", () => {
         setUploadAutoMode(true);
-        saveCurrentTask("");
         textContent.focus();
     });
     descriptionBtn.addEventListener("click", async () => {
         try {
             const data = await fetchSummary();
-            openCompactPanel("Загруженные ответы", renderUploadsList(data.uploads || []));
+            openCompactPanel("Загруженные ответы", renderUploadsList(data.uploads || []), "uploads");
         } catch (error) {
             showToast(error.message || "Ошибка");
         }
@@ -1240,7 +1403,7 @@
     finishBtn.addEventListener("click", async () => {
         try {
             const data = await fetchSummary();
-            openCompactPanel("Ответы на задания", renderAnswersList(data.task_numbers || taskNumbers, data.answers || {}));
+            openCompactPanel("Ответы на задания", renderAnswersList(data.task_numbers || taskNumbers, data.answers || {}), "answers");
         } catch (error) {
             showToast(error.message || "Ошибка");
         }

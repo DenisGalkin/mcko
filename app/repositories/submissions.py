@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from sqlalchemy import insert, select
 from sqlalchemy.orm import Session
 
@@ -57,9 +59,58 @@ def fetch_answer_sources(user_id: int) -> dict[str, str]:
     return {row["task_number"]: row["answer_source"] for row in rows}
 
 
+def fetch_answer_overview(user_id: int) -> tuple[set[str], dict[str, str], dict[str, str]]:
+    answer_expression = get_user_answer_expression()
+    rows = execute_text(
+        f"""
+        SELECT s.task_number,
+               {answer_expression} AS answer_text,
+               CASE
+                   WHEN TRIM(COALESCE(s.admin_answer, '')) <> '' THEN 'admin'
+                   WHEN TRIM(COALESCE(s.ai_answer, '')) <> '' THEN 'ai'
+                   ELSE ''
+               END AS answer_source
+        FROM submissions s
+        JOIN (
+            SELECT task_number, MAX(id) AS max_id
+            FROM submissions
+            WHERE user_id = :user_id
+              AND TRIM(COALESCE({answer_expression}, '')) <> ''
+            GROUP BY task_number
+        ) latest
+        ON latest.max_id = s.id
+        """,
+        {"user_id": user_id},
+    ).mappings().all()
+    teacher_answers = {row["task_number"]: row["answer_text"] for row in rows}
+    answer_sources = {row["task_number"]: row["answer_source"] for row in rows}
+    return set(teacher_answers.keys()), teacher_answers, answer_sources
+
+
 def fetch_answer_state(user_id: int) -> tuple[set[str], dict[str, str]]:
-    teacher_answers = fetch_teacher_answers(user_id)
-    return set(teacher_answers.keys()), teacher_answers
+    answered_tasks, teacher_answers, _answer_sources = fetch_answer_overview(user_id)
+    return answered_tasks, teacher_answers
+
+
+def fetch_files_for_submissions(submission_ids: Sequence[int], session: Session | None = None) -> dict[int, list[dict]]:
+    if not submission_ids:
+        return {}
+
+    rows = (session or db_session.get_session()).execute(
+        select(
+            submission_files.c.submission_id,
+            submission_files.c.original_name,
+            submission_files.c.stored_name,
+        )
+        .where(submission_files.c.submission_id.in_(submission_ids))
+        .order_by(submission_files.c.id)
+    ).mappings().all()
+    files_by_submission: dict[int, list[dict]] = {}
+    for row in rows:
+        files_by_submission.setdefault(row["submission_id"], []).append(
+            {"original_name": row["original_name"], "stored_name": row["stored_name"]}
+        )
+    return files_by_submission
 
 
 def fetch_used_tasks(user_id: int) -> list[str]:
@@ -255,21 +306,7 @@ def fetch_submissions() -> list[dict]:
     if not rows:
         return []
 
-    submission_ids = [row["id"] for row in rows]
-    file_rows = db_session.get_session().execute(
-        select(
-            submission_files.c.submission_id,
-            submission_files.c.original_name,
-            submission_files.c.stored_name,
-        )
-        .where(submission_files.c.submission_id.in_(submission_ids))
-        .order_by(submission_files.c.id)
-    ).mappings().all()
-    files_by_submission: dict[int, list[dict]] = {}
-    for row in file_rows:
-        files_by_submission.setdefault(row["submission_id"], []).append(
-            {"original_name": row["original_name"], "stored_name": row["stored_name"]}
-        )
+    files_by_submission = fetch_files_for_submissions([row["id"] for row in rows])
 
     return [
         build_submission_payload(
@@ -318,13 +355,14 @@ def fetch_user_summary_uploads(user_id: int) -> list[dict]:
         """,
         {"user_id": user_id},
     ).mappings().all()
+    files_by_submission = fetch_files_for_submissions([row["id"] for row in rows])
     return [
         {
             "id": row["id"],
             "task_number": row["task_number"],
             "text_content": row["text_content"],
             "created": row["created_at"],
-            "files": get_submission_files(row["id"]),
+            "files": files_by_submission.get(row["id"], []),
         }
         for row in rows
     ]
