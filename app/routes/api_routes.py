@@ -177,4 +177,28 @@ def patch_task(task_key: str):
         updated_count = submissions.update_submission_admin_answer(submission_id, answer_text)
         if updated_count == 0:
             return jsonify({"ok": False, "error": "Загрузка не найдена."}), 404
+    if "ai_answer_text" in payload:
+        answer_text = normalize_text(payload.get("ai_answer_text", ""))
+        updated_count = submissions.update_submission_ai_answer_from_admin(submission_id, answer_text)
+        if updated_count == 0:
+            return jsonify({"ok": False, "error": "Загрузка не найдена."}), 404
     return jsonify({"ok": True, "task": submissions.fetch_submission(submission_id), "tasks": submissions.fetch_submissions()})
+
+
+@api_bp.route("/api/tasks/<path:task_key>", methods=["DELETE"])
+def delete_task(task_key: str):
+    gate = admin_required()
+    if gate is not None:
+        return jsonify({"ok": False, "error": "Нужен вход в админку"}), 401
+    try:
+        submission_id = submission_service.parse_task_key(task_key)
+    except ValueError as error:
+        return jsonify({"ok": False, "error": str(error)}), 400
+
+    if not submissions.fetch_submission(submission_id):
+        return jsonify({"ok": False, "error": "Загрузка не найдена."}), 404
+    submission_service.delete_submission_files(submission_id)
+    deleted_count = submissions.delete_submission(submission_id)
+    if deleted_count == 0:
+        return jsonify({"ok": False, "error": "Загрузка не найдена."}), 404
+    return jsonify({"ok": True, "tasks": submissions.fetch_submissions()})

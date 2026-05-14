@@ -544,6 +544,57 @@ def update_submission_admin_answer(submission_id: int, answer_text: str) -> int:
     return result.rowcount
 
 
+def update_submission_ai_answer_from_admin(submission_id: int, answer_text: str) -> int:
+    timestamp = current_timestamp()
+    row = execute_text(
+        "SELECT user_id FROM submissions WHERE id = :submission_id",
+        {"submission_id": submission_id},
+    ).mappings().first()
+    result = execute_text(
+        """
+        UPDATE submissions
+        SET admin_answer = '',
+            ai_answer = :answer_text,
+            ai_processing_at = NULL,
+            admin_processing_by = CASE WHEN TRIM(:answer_text) <> '' THEN '' ELSE admin_processing_by END,
+            admin_processing_at = CASE WHEN TRIM(:answer_text) <> '' THEN NULL ELSE admin_processing_at END,
+            ai_generated_at = :generated_at,
+            updated_at = :updated_at,
+            answered_at = CASE
+                WHEN TRIM(:answer_text) <> '' THEN :answered_at
+                ELSE NULL
+            END
+        WHERE id = :submission_id
+        """,
+        {
+            "answer_text": answer_text,
+            "generated_at": timestamp if answer_text else None,
+            "updated_at": timestamp,
+            "answered_at": timestamp,
+            "submission_id": submission_id,
+        },
+    )
+    if result.rowcount and row:
+        recalculate_user_task_priorities(int(row["user_id"]))
+    db_session.commit()
+    return result.rowcount
+
+
+def delete_submission(submission_id: int) -> int:
+    row = execute_text(
+        "SELECT user_id FROM submissions WHERE id = :submission_id",
+        {"submission_id": submission_id},
+    ).mappings().first()
+    result = execute_text(
+        "DELETE FROM submissions WHERE id = :submission_id",
+        {"submission_id": submission_id},
+    )
+    if result.rowcount and row:
+        recalculate_user_task_priorities(int(row["user_id"]))
+    db_session.commit()
+    return result.rowcount
+
+
 def set_submission_ai_processing(submission_id: int, processing: bool, session: Session | None = None) -> int:
     result = execute_text(
         """

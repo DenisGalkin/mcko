@@ -38,12 +38,16 @@
                         <strong id="statTotal">0</strong>
                     </div>
                     <div class="admin_stat">
-                        <span>С ответом</span>
-                        <strong id="statSolved">0</strong>
-                    </div>
-                    <div class="admin_stat">
                         <span>Без ответа</span>
                         <strong id="statOpen">0</strong>
+                    </div>
+                    <div class="admin_stat">
+                        <span>В работе</span>
+                        <strong id="statProcessing">0</strong>
+                    </div>
+                    <div class="admin_stat">
+                        <span>С ответом</span>
+                        <strong id="statSolved">0</strong>
                     </div>
                 </div>
 
@@ -53,15 +57,9 @@
                             id="adminSearch"
                             class="admin_search"
                             type="text"
-                            placeholder="Поиск по никнейму, UID, номеру, тексту, ответу"
+                            placeholder="Поиск по нику, ID или тексту"
                         />
-                        <button type="button" id="clearFiltersBtn" class="admin_ghost_btn">
-                            Сбросить
-                        </button>
                     </div>
-                    <select id="adminUserFilter" class="admin_search">
-                        <option value="">Все пользователи</option>
-                    </select>
                     <div class="admin_filter_row">
                         <button type="button" class="admin_filter_btn active" data-filter="all">
                             Все
@@ -76,21 +74,41 @@
                             С ответом
                         </button>
                     </div>
+                    <div class="admin_filter_field">
+                        <label for="adminUserFilter">Пользователь:</label>
+                        <select id="adminUserFilter" class="admin_search">
+                            <option value="">Все пользователи</option>
+                        </select>
+                    </div>
+                    <div class="admin_filter_field">
+                        <label for="adminSort">Сортировка:</label>
+                        <select id="adminSort" class="admin_search">
+                            <option value="priority">По приоритету</option>
+                            <option value="newest">Сначала новые</option>
+                            <option value="oldest">Сначала старые</option>
+                            <option value="user">По пользователю</option>
+                            <option value="open_first">Без ответа первыми</option>
+                        </select>
+                    </div>
+                    <button type="button" id="clearFiltersBtn" class="admin_ghost_btn admin_reset_btn">
+                        Сбросить фильтры
+                    </button>
                 </div>
 
-                <div class="admin_list_meta" id="adminListMeta"></div>
                 <div class="admin_task_list" id="adminTaskList"></div>
+                <div class="admin_list_meta" id="adminListMeta"></div>
             </aside>
 
             <main class="admin_main">
                 <div class="admin_toolbar">
                     <div class="admin_toolbar_left">
-                        <button type="button" id="prevTaskBtn">Предыдущее</button>
-                        <button type="button" id="nextTaskBtn">Следующее</button>
+                        <button type="button" id="prevTaskBtn">← Предыдущее</button>
+                        <button type="button" id="nextTaskBtn">Следующее →</button>
+                        <button type="button" id="nextOpenTaskBtn" class="admin_primary_btn">Следующее без ответа →</button>
                     </div>
                     <div class="admin_toolbar_right">
                         <button type="button" id="refreshTasksBtn">Обновить</button>
-                        <form method="post" action="{{ url_for('admin.admin_logout') }}">
+                        <form method="post" action="{{ url_for('admin.admin_logout') }}" id="adminLogoutForm">
                             <button type="submit" class="admin_ghost_btn">Выйти</button>
                         </form>
                     </div>
@@ -102,24 +120,27 @@
                 </section>
 
                 <section class="admin_editor" id="adminEditor" hidden>
-                    <div class="admin_heading">
+                    <div class="admin_heading admin_card">
                         <div>
-                            <div class="admin_heading_kicker">Задание</div>
                             <h1 id="adminTaskTitle">№</h1>
+                            <div class="admin_task_subline" id="adminTaskSubline"></div>
                             <div class="admin_heading_tags" id="adminHeadingTags"></div>
-                        </div>
-                        <div class="admin_heading_meta">
-                            <span id="adminTaskCreated"></span>
-                            <span id="adminTaskStatus" class="admin_status_chip"></span>
                         </div>
                     </div>
 
                     <div class="admin_card">
                         <div class="admin_card_title">
                             <span>Задание</span>
-                            <a id="adminDownloadLink" href="#" target="_blank" rel="noreferrer" hidden>
-                                Открыть файл
-                            </a>
+                            <div class="admin_file_actions">
+                                <button type="button" id="previewFitBtn" class="admin_icon_btn active" hidden>По ширине</button>
+                                <button type="button" id="previewScrollBtn" class="admin_icon_btn" hidden>100%</button>
+                                <button type="button" id="previewZoomInBtn" class="admin_icon_btn" hidden>+</button>
+                                <button type="button" id="previewZoomOutBtn" class="admin_icon_btn" hidden>−</button>
+                                <button type="button" id="previewRotateBtn" class="admin_icon_btn" hidden>Повернуть</button>
+                                <a id="adminDownloadLink" href="#" target="_blank" rel="noreferrer" hidden>
+                                    Открыть файл
+                                </a>
+                            </div>
                         </div>
                         <div class="admin_preview_wrap" id="adminPreviewWrap" hidden></div>
                         <div class="admin_file_meta" id="adminFileMeta" hidden>
@@ -129,16 +150,21 @@
                     </div>
 
                     <div class="admin_card">
+                        <div class="admin_card_title">
+                            <span>Статус проверки</span>
+                            <span class="admin_work_owner" id="adminWorkOwner"></span>
+                        </div>
                         <label class="admin_work_toggle">
-                            <span>Задание взято в работу админом</span>
                             <input type="checkbox" id="adminInProgressToggle">
+                            <span>Взято в работу мной</span>
                         </label>
+                        <button type="button" id="releaseWorkBtn" class="admin_ghost_btn admin_release_btn" hidden>Освободить</button>
                     </div>
 
                     <div class="admin_card">
                         <div class="admin_card_title">
                             <span>Ответ</span>
-                            <span class="admin_card_hint">Сохраняется для выбранного задания</span>
+                            <span class="admin_save_status" id="adminSaveStatus">Не заполнен</span>
                         </div>
                         <textarea
                             id="adminAnswerText"
@@ -146,12 +172,27 @@
                             placeholder="Введите или отредактируйте ответ"
                         ></textarea>
                         <div class="admin_action_row">
-                            <button type="button" id="saveAnswerBtnAdmin">Сохранить ответ</button>
-                            <button type="button" id="clearAnswerBtn">Очистить ответ</button>
+                            <button type="button" id="sendAnswerBtnAdmin" class="admin_primary_btn">Отправить ученику</button>
+                            <button type="button" id="sendAiAnswerBtn" class="admin_ai_btn">Ответить как ИИ</button>
+                            <button type="button" id="deleteStudentAnswerBtn" class="admin_danger_btn">Удалить у ученика</button>
+                            <button type="button" id="saveAnswerBtnAdmin">Сохранить</button>
+                            <button type="button" id="clearAnswerBtn">Очистить</button>
+                            <button type="button" id="deleteTaskBtn" class="admin_danger_btn">Удалить задание</button>
                         </div>
                     </div>
                 </section>
             </main>
+        </div>
+
+        <div class="admin_confirm" id="adminUnsavedDialog" hidden role="dialog" aria-modal="true" aria-labelledby="adminUnsavedTitle">
+            <div class="admin_confirm_card">
+                <h2 id="adminUnsavedTitle">У вас есть несохранённый ответ.</h2>
+                <div class="admin_confirm_actions">
+                    <button type="button" id="unsavedSaveBtn" class="admin_primary_btn">Сохранить</button>
+                    <button type="button" id="unsavedDiscardBtn">Перейти без сохранения</button>
+                    <button type="button" id="unsavedCancelBtn" class="admin_ghost_btn">Отмена</button>
+                </div>
+            </div>
         </div>
 
         <script>
