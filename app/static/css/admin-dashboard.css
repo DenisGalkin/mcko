@@ -821,7 +821,7 @@ body {
     border: 1px solid var(--admin-border);
     border-radius: var(--admin-radius);
     background: #ffffff;
-    padding: 20px;
+    padding: 18px 16px 20px;
     box-shadow: var(--admin-shadow);
 }
 
@@ -1306,40 +1306,41 @@ body {
 .admin_stats {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 8px;
-    margin-bottom: 16px;
+    gap: 10px;
+    margin-bottom: 18px;
 }
 
 .admin_stat {
     min-width: 0;
-    padding: 10px 11px;
+    padding: 12px;
     border: 1px solid var(--admin-border);
-    border-radius: 8px;
+    border-radius: 10px;
     background: var(--admin-panel);
 }
 
 .admin_stat span {
     display: block;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
     color: var(--admin-muted);
-    font-size: 11px;
-    line-height: 1.1;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    font-size: 12px;
+    line-height: 1.25;
 }
 
 .admin_stat strong {
     display: block;
     color: var(--admin-text);
-    font-size: 24px;
-    line-height: 1;
+    font-size: 22px;
+    line-height: 1.05;
 }
 
 .admin_filters {
     display: grid;
-    gap: 10px;
-    margin-bottom: 14px;
+    gap: 12px;
+    margin-bottom: 18px;
+    padding: 14px;
+    border: 1px solid var(--admin-border);
+    border-radius: 10px;
+    background: var(--admin-panel-soft);
 }
 
 .admin_search_row {
@@ -1367,8 +1368,9 @@ body {
 
 .admin_filter_row {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 6px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    min-width: 0;
 }
 
 .admin_filter_btn {
@@ -1376,23 +1378,28 @@ body {
     align-items: center;
     justify-content: center;
     gap: 4px;
-    min-height: 36px;
-    padding: 7px 5px;
+    width: 100%;
+    min-width: 0;
+    min-height: 38px;
+    padding: 8px 10px;
     border: 1px solid var(--admin-border);
     border-radius: 8px;
     background: #ffffff;
     color: var(--admin-text);
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 800;
-    white-space: nowrap;
+    line-height: 1.2;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-align: center;
 }
 
 .admin_filter_btn span {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 18px;
-    height: 18px;
+    min-width: 20px;
+    height: 20px;
     border-radius: 999px;
     background: var(--admin-panel-soft);
     color: inherit;
@@ -1424,27 +1431,20 @@ body {
 
 .admin_reset_btn {
     width: 100%;
-    min-height: 36px !important;
-}
-
-.admin_list_meta {
-    margin: 12px 0 0;
-    color: var(--admin-muted);
-    font-size: 13px;
-    font-weight: 700;
+    min-height: 38px !important;
 }
 
 .admin_task_list {
     display: grid;
-    gap: 8px;
+    gap: 10px;
 }
 
 .admin_task_item {
     width: 100%;
     min-height: 0;
-    padding: 12px 18px;
+    padding: 14px 16px;
     border: 1px solid var(--admin-border);
-    border-radius: 8px;
+    border-radius: 10px;
     background: #ffffff;
     color: var(--admin-text);
     text-align: left;
@@ -1554,7 +1554,7 @@ body {
 
 .admin_task_user,
 .admin_task_priority {
-    margin-top: 5px;
+    margin-top: 6px;
     color: #2e4058;
     font-weight: 700;
 }
@@ -1599,7 +1599,7 @@ body {
 
 .admin_main {
     min-width: 0;
-    padding: 20px 24px;
+    padding: 22px 26px;
 }
 
 .admin_toolbar {
@@ -1610,8 +1610,8 @@ body {
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-    margin: -20px -24px 14px;
-    padding: 20px 24px 14px;
+    margin: -22px -26px 18px;
+    padding: 18px 26px 14px;
     border-bottom: 1px solid var(--admin-border);
     background: rgba(244, 247, 251, 0.96);
 }
@@ -1725,14 +1725,14 @@ body {
 
 .admin_editor {
     display: grid;
-    gap: 12px;
+    gap: 14px;
 }
 
 .admin_card {
     min-width: 0;
-    padding: 16px;
+    padding: 18px;
     border: 1px solid var(--admin-border);
-    border-radius: 10px;
+    border-radius: 12px;
     background: #ffffff;
     box-shadow: none;
 }
@@ -1809,7 +1809,7 @@ body {
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    margin-bottom: 12px;
+    margin-bottom: 14px;
     color: var(--admin-text);
     font-size: 16px;
     font-weight: 900;
@@ -1844,7 +1844,7 @@ body {
     margin: 0;
     overflow: auto;
     border: 1px solid var(--admin-border);
-    border-radius: 8px;
+    border-radius: 10px;
     background: #ffffff;
 }
 
@@ -1885,9 +1885,9 @@ body {
 .admin_task_text_block {
     display: block;
     margin: 0;
-    padding: 16px;
+    padding: 18px;
     border: 1px solid var(--admin-border);
-    border-radius: 8px;
+    border-radius: 10px;
     background: var(--admin-panel-soft);
     color: #1c2f47;
     font-size: 16px;
@@ -1955,10 +1955,10 @@ body {
 
 .admin_textarea {
     width: 100%;
-    min-height: 116px;
+    min-height: 140px;
     padding: 14px 16px;
     border: 1px solid var(--admin-border);
-    border-radius: 8px;
+    border-radius: 10px;
     background: #ffffff;
     color: var(--admin-text);
     font-size: 15px;
@@ -1978,7 +1978,7 @@ body {
 }
 
 .admin_action_row {
-    margin-top: 14px;
+    margin-top: 16px;
 }
 
 .admin_action_row button {

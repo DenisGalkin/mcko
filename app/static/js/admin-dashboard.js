@@ -2,7 +2,6 @@ const initialTasks = window.adminInitialTasks || [];
 const initialAiAllowed = window.adminInitialAiAllowed || [];
 
 const adminTaskList = document.getElementById("adminTaskList");
-const adminListMeta = document.getElementById("adminListMeta");
 const adminSearch = document.getElementById("adminSearch");
 const adminUserFilter = document.getElementById("adminUserFilter");
 const adminSort = document.getElementById("adminSort");
@@ -273,9 +272,6 @@ function renderUserFilter() {
 function renderTaskList() {
   const filtered = getFilteredTasks();
   adminTaskList.innerHTML = "";
-  adminListMeta.textContent = filtered.length
-    ? `Показано ${filtered.length} из ${state.tasks.length} заданий`
-    : "Ничего не найдено";
 
   if (!filtered.length) {
     adminTaskList.innerHTML = '<div class="admin_list_empty">Ничего не найдено по текущему фильтру.</div>';
@@ -398,9 +394,6 @@ function renderHeadingTags(task) {
     `<span class="admin_tag is-info">Приоритет: ${escapeHtml(task.task_priority)}</span>`,
     `<span class="admin_tag ${isTaskUserAiAllowed(task) ? "is-success" : "is-info"}">${isTaskUserAiAllowed(task) ? "AI разрешён" : "AI запрещён"}</span>`,
   ];
-  if (task.user_current_task) {
-    tags.push(`<span class="admin_tag is-info">Очередь ученика: №${escapeHtml(task.user_current_task)}</span>`);
-  }
   adminHeadingTags.innerHTML = tags.join("");
 }
 
