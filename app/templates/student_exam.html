@@ -1109,6 +1109,9 @@
         const answer = getTaskAnswerText(task);
         const textFields = getTaskTextFields();
         if (!answer) {
+            textFields.forEach((field) => {
+                field.value = "";
+            });
             const generatedField = taskHost.querySelector("[data-generated-answer-field] input");
             if (generatedField) {
                 generatedField.value = "";
@@ -1128,6 +1131,14 @@
                 textFields[1].value = parts[1];
                 return;
             }
+        }
+
+        if (textFields.length >= 1) {
+            textFields[0].value = answer;
+            textFields.slice(1).forEach((field) => {
+                field.value = "";
+            });
+            return;
         }
 
         const generatedField = taskHost.querySelector("[data-generated-answer-field] input");
