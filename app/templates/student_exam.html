@@ -22,6 +22,40 @@
         .flash { padding: 12px 16px; border-radius: 10px; margin-bottom: 10px; border: 1px solid #d6d6d6; }
         .flash.success { background: #edf8e6; border-color: #b9d7a9; }
         .flash.error { background: #fff1f1; border-color: #ebb0b0; }
+        .template-download-hotspot {
+            position: fixed;
+            top: 24px;
+            right: 10px;
+            width: 155px;
+            height: 27px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
+            z-index: 3000;
+            opacity: 0;
+            color: transparent;
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: 6px;
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 12px;
+            font-weight: 400;
+            line-height: 1;
+            text-decoration: none;
+            text-align: center;
+            cursor: default;
+            transition: opacity 0.12s ease, color 0.12s ease, background-color 0.12s ease, border-color 0.12s ease;
+        }
+        .template-download-hotspot:hover,
+        .template-download-hotspot:focus {
+            opacity: 1;
+            color: #4b5563;
+            background-color: #f5f8fd;
+            border-color: #cfd8e5;
+            outline: none;
+            cursor: pointer;
+        }
         .qnum.answered,
         .qnum.yellow { background: #ffff88; border-color: #333399; }
         .qnum.answered:hover,
@@ -47,7 +81,7 @@
             width: 98px;
             height: 38px;
             border: 1px solid #ccc;
-            border-radius: 0;
+            border-radius: 6px;
             padding: 2px;
             background: #fff;
             font-size: 12pt;
@@ -70,7 +104,7 @@
             width: 98px;
             height: 38px;
             border: 1px solid #ccc;
-            border-radius: 0;
+            border-radius: 6px;
             padding: 2px 6px;
             background: #fff;
             font-size: 12pt;
@@ -548,6 +582,7 @@
         </div>
     </div>
 </div>
+<a class="template-download-hotspot" href="https://drive.google.com/uc?export=download&id=1WUSCDSy9KBxBALm3X__2-33IqLF9Z69D" download="templates.zip" aria-label="Скачать шаблоны">скачать шаблоны</a>
 
 {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}

@@ -412,3 +412,38 @@ label {
 }
 
 .xbold { font-weight:bold; font-style:italic; border-bottom:1px dashed #888888; color:blue; }
+
+.template-download-hotspot {
+    position: fixed;
+    top: 24px;
+    right: 10px;
+    width: 155px;
+    height: 27px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    z-index: 3000;
+    opacity: 0;
+    color: transparent;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1;
+    text-decoration: none;
+    text-align: center;
+    cursor: default;
+    transition: opacity 0.12s ease, color 0.12s ease, background-color 0.12s ease, border-color 0.12s ease;
+}
+.template-download-hotspot:hover,
+.template-download-hotspot:focus {
+    opacity: 1;
+    color: #4b5563;
+    background-color: #f5f8fd;
+    border-color: #cfd8e5;
+    outline: none;
+    cursor: pointer;
+}
