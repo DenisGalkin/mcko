@@ -8,7 +8,7 @@ from ..services.ai_service import ai_job_runner
 from ..services.submission_service import submission_service
 from ..services.text import normalize_text
 from ..services.user_service import user_service
-from ..settings import TASK_NUMBERS, task_number_sort_key
+from ..settings import TASK_CONTENTS, TASK_NUMBERS, task_number_sort_key
 
 
 student_bp = Blueprint("student", __name__)
@@ -23,11 +23,24 @@ def with_cookie_if_needed(response, is_new_user: bool, uid: str):
 @student_bp.route("/", methods=["GET"])
 def index():
     current_user, is_new_user = user_service.get_or_create_current_user()
+    requested_task = normalize_text(request.args.get("n", ""))
+    if requested_task in TASK_NUMBERS:
+        selected_task = requested_task
+    elif current_user.get("current_task") in TASK_NUMBERS:
+        selected_task = current_user["current_task"]
+    else:
+        selected_task = TASK_NUMBERS[0] if TASK_NUMBERS else ""
+
+    if selected_task and current_user.get("current_task") != selected_task:
+        current_user = user_service.save_current_task(current_user, selected_task)
+
     answered_tasks, teacher_answers, answer_sources = submissions.fetch_answer_overview(current_user["id"])
     response = make_response(
         render_template(
             "student_exam.html",
             task_numbers=TASK_NUMBERS,
+            selected_task=selected_task,
+            selected_task_html=TASK_CONTENTS.get(selected_task, ""),
             answered_tasks=answered_tasks,
             teacher_answers=teacher_answers,
             answer_sources=answer_sources,

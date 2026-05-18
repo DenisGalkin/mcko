@@ -13,7 +13,7 @@ from .auth import admin_required, get_admin_worker_id
 admin_bp = Blueprint("admin", __name__)
 
 
-@admin_bp.route("/admin", methods=["GET"])
+@admin_bp.route("/admin", methods=["GET"], strict_slashes=False)
 def admin():
     gate = admin_required()
     if gate is not None:
@@ -28,7 +28,7 @@ def admin():
     )
 
 
-@admin_bp.route("/admin/login", methods=["GET", "POST"])
+@admin_bp.route("/admin/login", methods=["GET", "POST"], strict_slashes=False)
 def admin_login():
     error = ""
     next_url = request.values.get("next") or url_for("admin.admin")
@@ -49,7 +49,7 @@ def admin_logout():
     return redirect(url_for("admin.admin_login"))
 
 
-@admin_bp.route("/admin/settings", methods=["GET"])
+@admin_bp.route("/admin/settings", methods=["GET"], strict_slashes=False)
 def admin_settings():
     gate = admin_required()
     if gate is not None:

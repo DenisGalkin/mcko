@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from ..db import session as db_session
 from ..db.schema import current_timestamp, submission_files, submissions
+from ..settings import TASK_NUMBERS
 from .common import execute_text, row_to_dict
 
 
@@ -15,6 +16,11 @@ TAG_AI_PROCESSING = "В обработке ИИ"
 TAG_AI_ANSWERED = "С ответом ИИ"
 TAG_ADMIN_PROCESSING = "В обработке Админа"
 TAG_ADMIN_ANSWERED = "С ответом Админа"
+
+TASK_NUMBER_ORDER_SQL = "\n".join(
+    f"                WHEN '{task_number}' THEN {index}"
+    for index, task_number in enumerate(TASK_NUMBERS, start=1)
+)
 
 
 def get_user_answer_expression() -> str:
@@ -411,7 +417,7 @@ def fetch_submission(submission_id: int, session: Session | None = None) -> dict
 
 def fetch_submissions() -> list[dict]:
     rows = execute_text(
-        """
+        f"""
         SELECT s.id, s.user_id, u.uid AS user_uid, u.nickname AS user_nickname,
                u.current_task AS user_current_task,
                s.task_number, s.text_content, s.admin_answer, s.ai_answer,
@@ -424,23 +430,7 @@ def fetch_submissions() -> list[dict]:
             COALESCE(s.submitted_at, s.created_at) DESC,
             s.id DESC,
             CASE s.task_number
-                WHEN '1' THEN 1
-                WHEN '2' THEN 2
-                WHEN '3' THEN 3
-                WHEN '4' THEN 4
-                WHEN '5' THEN 5
-                WHEN '6' THEN 6
-                WHEN '7' THEN 7
-                WHEN '8' THEN 8
-                WHEN '9' THEN 9
-                WHEN '10' THEN 10
-                WHEN '11' THEN 11
-                WHEN '12' THEN 12
-                WHEN '13' THEN 13
-                WHEN '14' THEN 14
-                WHEN '15' THEN 15
-                WHEN '16' THEN 16
-                WHEN '17' THEN 17
+{TASK_NUMBER_ORDER_SQL}
                 ELSE 999
             END
         """
