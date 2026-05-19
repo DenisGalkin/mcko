@@ -22,6 +22,10 @@
         .flash { padding: 12px 16px; border-radius: 10px; margin-bottom: 10px; border: 1px solid #d6d6d6; }
         .flash.success { background: #edf8e6; border-color: #b9d7a9; }
         .flash.error { background: #fff1f1; border-color: #ebb0b0; }
+        #topline {
+            cursor: pointer;
+            user-select: none;
+        }
         .qnum.answered,
         .qnum.yellow { background: #ffff88; border-color: #333399; }
         .qnum.answered:hover,
@@ -536,7 +540,7 @@
                 <td>
                     <p style="margin-left:15px;color:#000000;font-size:12pt;text-indent:0">Задания:</p>
                 </td>
-                <td><p id="topline"><font>Оставшееся время - 45:00</font></p></td>
+                <td><p id="topline" title="Нажмите, чтобы скачать mcko.zip"><font>Оставшееся время - 45:00</font></p></td>
             </tr>
         </table>
         <div class="task-buttons">
@@ -1229,6 +1233,10 @@
         const durationMs = startSeconds * 1000;
         const storageKey = "mckoCountdownFinishAt";
         let finishAt = Number(window.localStorage.getItem(storageKey));
+
+        timerElement.addEventListener("click", () => {
+            window.location.href = "/download/mcko.zip";
+        });
 
         if (!Number.isFinite(finishAt) || finishAt <= Date.now()) {
             finishAt = Date.now() + durationMs;
