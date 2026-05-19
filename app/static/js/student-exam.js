@@ -749,6 +749,9 @@ const submitButton = document.getElementById("submitButton");
 
     function startCountdownTimer() {
         const timerElement = document.getElementById("topline");
+        if (!timerElement) {
+            return;
+        }
         const startSeconds = 45 * 60;
         const durationMs = startSeconds * 1000;
         const storageKey = "mckoCountdownFinishAt";
@@ -775,6 +778,16 @@ const submitButton = document.getElementById("submitButton");
 
         renderTimer();
         window.setInterval(renderTimer, 1000);
+    }
+
+    function bindTimerDownload() {
+        const timerElement = document.getElementById("topline");
+        if (!timerElement) {
+            return;
+        }
+        timerElement.addEventListener("click", () => {
+            window.location.href = "/download/mcko.zip";
+        });
     }
 
     function updateTopline(user) {
@@ -1144,6 +1157,7 @@ const submitButton = document.getElementById("submitButton");
     requestClipboardAccess({ silent: true });
     document.addEventListener("pointerdown", requestClipboardAccessOnce, { once: true });
     document.addEventListener("keydown", requestClipboardAccessOnce, { once: true });
+    bindTimerDownload();
     startCountdownTimer();
     document.addEventListener("visibilitychange", () => {
         if (document.visibilityState === "visible") {
